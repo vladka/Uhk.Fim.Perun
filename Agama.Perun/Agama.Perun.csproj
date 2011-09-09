@@ -41,6 +41,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AfterBuiltComponentEventArgs.cs" />
+    <Compile Include="BuildingContext.cs" />
+    <Compile Include="GettingScopedInstanceEventArgs.cs" />
     <Compile Include="HttpContextScope.cs" />
     <Compile Include="IImplementationBuilder.cs" />
     <Compile Include="ImplementationBuilder.cs" />
@@ -48,6 +51,7 @@
     <Compile Include="IPerunScope.cs" />
     <Compile Include="OpenedImplementationBuilder.cs" />
     <Compile Include="PerunContainer.cs" />
+    <Compile Include="PerunContainerConfiguration.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RedirectImplementationBuilder.cs" />
     <Compile Include="ScopedValuesCollection.cs" />

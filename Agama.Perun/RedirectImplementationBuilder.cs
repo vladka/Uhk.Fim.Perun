@@ -5,15 +5,27 @@ namespace Agama.Perun
     /// <summary>
     /// Pouze presmerovaci implementace, ktera deleguje volani na otevrenou definici
     /// </summary>
-    internal class RedirectImplementationBuilder : IImplementationBuilder
+    public sealed class RedirectImplementationBuilder : IImplementationBuilder
     {
         public readonly OpenedImplementationBuilder Target;
 
-        public RedirectImplementationBuilder(OpenedImplementationBuilder target)
+        internal RedirectImplementationBuilder(OpenedImplementationBuilder target)
         {
             Target = target;
         }
 
+        public event EventHandler<GettingScopedInstanceEventArgs> AfterGotScoped;
+        private void OnAfterGetScopedInstance(GettingScopedInstanceEventArgs args)
+        {
+            if (AfterGotScoped != null)
+                AfterGotScoped(this, args);
+        }
+        public event EventHandler<AfterBuiltComponentEventArgs> AfterBuiltNewComponent;
+        private void OnAfterBuiltNewComponent(AfterBuiltComponentEventArgs args)
+        {
+            if (AfterBuiltNewComponent != null)
+                AfterBuiltNewComponent(this, args);
+        }
 
         public object Get(BuildingContext ctx)
         {

@@ -2,6 +2,10 @@
 
 namespace Agama.Perun
 {
+    /// <summary>
+    /// Transient scope = no scope. Use this as singleton (<see cref="Instance"/>)
+    /// New component are constructed everytime.
+    /// </summary>
     public class TransientScope : IPerunScope
     {
 

@@ -54,6 +54,7 @@ namespace Agama.Perun
         /// <param name="match">Optional. If null, every instances from every scopes are removed.</param>
         public void RemoveAll(Predicate<object> match ) 
         {
+            var toDelete = new List<WeakReference>();
             foreach (KeyValuePair<WeakReference, List<ScopedValuesCollection>> pair in _all)
             {
                 if ((!pair.Key.IsAlive) || (match != null && (!match(pair.Key.Target)))) 
@@ -62,8 +63,10 @@ namespace Agama.Perun
                 {
                     scopedValues.Remove(pair.Key);
                 }
-                _all.Remove(pair.Key); //zruseni celeho paru
+                toDelete.Add(pair.Key);
+                
             }
+            toDelete.ForEach(x=>_all.Remove(x));
         }
         
       

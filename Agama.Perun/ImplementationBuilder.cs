@@ -2,7 +2,10 @@
 
 namespace Agama.Perun
 {
-    internal class ImplementationBuilder<TPluginType> : IImplementationBuilder
+    /// <summary>
+    /// Generic builder used for resolving fully specified componenets (not for opened generic types)
+    /// </summary>
+    public class ImplementationBuilder<TPluginType> : IImplementationBuilder
     {
 
         private readonly ScoppingRegistration _scoppingRegistration;
@@ -11,7 +14,7 @@ namespace Agama.Perun
         private readonly ScopedValuesCollection _scopedValues;
 
 
-        public ImplementationBuilder(ScoppingRegistration scoppingRegistration, Func<BuildingContext, TPluginType> factoryMethod, IPerunScope scope)
+        internal ImplementationBuilder(ScoppingRegistration scoppingRegistration, Func<BuildingContext, TPluginType> factoryMethod, IPerunScope scope)
         {
 
             _scoppingRegistration = scoppingRegistration;
@@ -21,8 +24,19 @@ namespace Agama.Perun
 
 
         }
-      
 
+        public event EventHandler<GettingScopedInstanceEventArgs> AfterGotScoped;
+        private void OnAfterGetScopedInstance(GettingScopedInstanceEventArgs args)
+        {
+            if (AfterGotScoped != null)
+                AfterGotScoped(this, args);
+        }
+        public event EventHandler<AfterBuiltComponentEventArgs> AfterBuiltNewComponent;
+        private void OnAfterBuiltNewComponent(AfterBuiltComponentEventArgs args)
+        {
+            if (AfterBuiltNewComponent != null)
+                AfterBuiltNewComponent(this, args);
+        }
 
         public IPerunScope Scope
         {
@@ -43,15 +57,26 @@ namespace Agama.Perun
 
             var scopeObj = _scope.Context;
             if (scopeObj == null)
-                return _factoryMethod(ctx);
+            {
+                //scope cache is not needed
+                var args = new AfterBuiltComponentEventArgs(_factoryMethod(ctx));
+                OnAfterBuiltNewComponent(args);
+                return (TPluginType) args.Component;
+            }
 
             var result = (TPluginType)_scopedValues.FindValueByScope(scopeObj);
-            if (!Object.Equals(result, default(TPluginType)))
-                return result;
+            if (!Object.Equals(result, default(TPluginType))) //if not null
+            {
+                var args2 = new GettingScopedInstanceEventArgs(result);
+                OnAfterGetScopedInstance(args2);
+                return (TPluginType) args2.Component;
+            }
 
             result = _factoryMethod(ctx);
-            _scopedValues.RegisterScopedObject(scopeObj, result);
-            return result;
+            var args3 = new AfterBuiltComponentEventArgs(result);
+            OnAfterBuiltNewComponent(args3);
+            _scopedValues.RegisterScopedObject(scopeObj, args3.Component);
+            return (TPluginType) args3.Component;
         }
         object IImplementationBuilder.Get(BuildingContext ctx)
         {
@@ -79,6 +104,8 @@ namespace Agama.Perun
                 return;
             Disposed = true;
             _scopedValues.Dispose();
+            AfterBuiltNewComponent = null;
+            AfterGotScoped = null;
             
         }
 
@@ -92,7 +119,11 @@ namespace Agama.Perun
 
     }
 
-    internal class ImplementationBuilder : IImplementationBuilder
+
+    /// <summary>
+    /// Builder used for resolving fully specified componenets (not for opened generic types)
+    /// </summary>
+    public class ImplementationBuilder : IImplementationBuilder
     {
 
         public readonly OpenedImplementationBuilder Creator;
@@ -104,7 +135,7 @@ namespace Agama.Perun
         private readonly ScopedValuesCollection _scopedValues;
 
 
-        public ImplementationBuilder(ScoppingRegistration scoppingRegistration, Type pluginType, Func<BuildingContext, object> factoryMethod, IPerunScope scope, OpenedImplementationBuilder creator = null)
+        internal ImplementationBuilder(ScoppingRegistration scoppingRegistration, Type pluginType, Func<BuildingContext, object> factoryMethod, IPerunScope scope, OpenedImplementationBuilder creator = null)
         {
             Creator = creator;
 
@@ -116,6 +147,19 @@ namespace Agama.Perun
             _scopedValues = new ScopedValuesCollection(scoppingRegistration);
 
 
+        }
+
+        public event EventHandler<GettingScopedInstanceEventArgs> AfterGotScoped;
+        private void OnAfterGetScopedInstance(GettingScopedInstanceEventArgs args)
+        {
+            if (AfterGotScoped != null)
+                AfterGotScoped(this, args);
+        }
+        public event EventHandler<AfterBuiltComponentEventArgs> AfterBuiltNewComponent;
+        private void OnAfterBuiltNewComponent(AfterBuiltComponentEventArgs args)
+        {
+            if (AfterBuiltNewComponent != null)
+                AfterBuiltNewComponent(this, args);
         }
 
         public IPerunScope Scope
@@ -145,6 +189,7 @@ namespace Agama.Perun
 
         //}
 
+       
 
         public object Get(BuildingContext ctx)
         {
@@ -156,17 +201,28 @@ namespace Agama.Perun
 
             var scopeObj = _scope.Context;
             if (scopeObj == null)
-                return _factoryMethod(ctx);
+            {   //scope cache is not needed
+                var args = new AfterBuiltComponentEventArgs(_factoryMethod(ctx));
+                OnAfterBuiltNewComponent(args);
+                return args.Component;
+            }
 
 
-
+            //component has been found in scope cache
             var result = _scopedValues.FindValueByScope(scopeObj);
             if (result != null)
-                return result;
+            {
+                var args2 = new GettingScopedInstanceEventArgs(result);
+                OnAfterGetScopedInstance(args2);
+                return args2.Component;
+            }
 
+            //component is not found in scope cache.
             result = _factoryMethod(ctx);
-            _scopedValues.RegisterScopedObject(scopeObj, result);
-            return result;
+            var args3 = new AfterBuiltComponentEventArgs(result);
+            OnAfterBuiltNewComponent(args3);
+            _scopedValues.RegisterScopedObject(scopeObj, args3.Component);
+            return args3.Component;
         }
 
 
@@ -192,6 +248,9 @@ namespace Agama.Perun
 
             Disposed = true;
             _scopedValues.Dispose();
+            AfterBuiltNewComponent = null;
+            AfterGotScoped = null;
+            
             
         }
 

@@ -2,7 +2,14 @@
 
 namespace Agama.Perun
 {
-    internal class OpenedImplementationBuilder : IImplementationBuilder
+   
+    /// <summary>
+    /// Builder for opened generics types.
+    /// It is used only for creating concrete builder
+    ///  (<see cref="ImplementationBuilder"/> or <see cref="ImplementationBuilder{TPluginType}"/>).
+    /// 
+    /// </summary>
+    public sealed class OpenedImplementationBuilder : IImplementationBuilder
     {
 
         private readonly ScoppingRegistration _scoppingRegistration;
@@ -12,16 +19,12 @@ namespace Agama.Perun
         
 
 
-        public OpenedImplementationBuilder(ScoppingRegistration scoppingRegistration, Type pluginType, Func<BuildingContext, object> factoryMethod, IPerunScope scope)
+        internal  OpenedImplementationBuilder(ScoppingRegistration scoppingRegistration, Type pluginType, Func<BuildingContext, object> factoryMethod, IPerunScope scope)
         {
-
             _scoppingRegistration = scoppingRegistration;
             _pluginType = pluginType;
             _factoryMethod = factoryMethod;
             _scope = scope;
-            
-
-
         }
 
         public IPerunScope Scope
@@ -32,8 +35,18 @@ namespace Agama.Perun
             }
         }
 
-      
-
+        public event EventHandler<GettingScopedInstanceEventArgs> AfterGotScoped;
+        private void OnAfterGetScopedInstance(GettingScopedInstanceEventArgs args)
+        {
+            if (AfterGotScoped != null)
+                AfterGotScoped(this, args);
+        }
+        public event EventHandler<AfterBuiltComponentEventArgs> AfterBuiltNewComponent;
+        private void OnAfterBuiltNewComponent(AfterBuiltComponentEventArgs args)
+        {
+            if (AfterBuiltNewComponent != null)
+                AfterBuiltNewComponent(this, args);
+        }
         //tato metoda probiha pouze poprve pri prvni vyrobe konkretniho generickeho typu
         public object Get(BuildingContext ctx)
         {

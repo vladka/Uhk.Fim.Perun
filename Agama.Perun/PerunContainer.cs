@@ -5,212 +5,121 @@ using System.Linq.Expressions;
 
 namespace Agama.Perun
 {
-
-    public class BuildingContext
-    {
-        /// <summary>
-        /// Type being now constructed.
-        /// </summary>
-        public readonly Type ResolvingType;
-        
-
-        public BuildingContext(Type resolvingType, PerunContainer container)
-        {
-            ResolvingType = resolvingType;
-            Container = container;
-        }
-
-
-        public IImplementationBuilder  CurrentBuilder 
-        {
-            get;internal set;
-        }
-
-        public PerunContainer Container 
-        {
-            get;
-            private  set;
-        }
-    }
-
-    //public class BuildingContext<T>
-    //{
-    //    public readonly Type ResolvingType;
-    //    public BuildingContext()
-    //    {
-    //        ResolvingType = typeof (T);
-    //    }
-    //    public IImplementationBuilder CurrentBuilder
-    //    {
-    //        get;
-    //        internal set;
-    //    }
-    //}
-
-
-   
-
-    public class PerunContainer :  IPerunScope, IDisposable
+    /// <summary>
+    /// DI container.
+    /// </summary>
+    public partial class PerunContainer :  IPerunScope, IDisposable
     {
         
         internal readonly Dictionary<Type,List<IImplementationBuilder>> _all = new Dictionary<Type, List<IImplementationBuilder>>();
         private ScoppingRegistration _scoppings = new ScoppingRegistration();
         private readonly Dictionary<Type, Type> _cache= new Dictionary<Type, Type>();
 
-        public PerunContainer()
-        {
-          
-            
-            var t = Expression.Constant(this);
-            //rozsireni pro podporu Func
-            this.RegisterType(typeof(Func<>),ctx =>
-             {
-                var targetType = ctx.ResolvingType.GetGenericArguments()[0];
-                Func<object> res = delegate()
-                                     {
-                                         var fce = GetFuncExpressionForResolvingType(targetType).Compile();
-                                         return fce;
-                                     };
-                 return res; //fce vracící fci
-                
-                // Type fType = Expression.GetFuncType(targetType);
-                //var exp = Expression.Call(t, "GetService",new Type[] {targetType});
-                //LambdaExpression result = Expression.Lambda(fType, exp);
-                //Delegate compiled = result.Compile();
-                //return compiled;
-            },new InnerTypeDependencyScope());
-
-
-
-            
-            
-            //rozsireni pro podporu Lazy
-            this.RegisterType(typeof(Lazy<>), ctx =>
-            {
-                var targetType = ctx.ResolvingType.GetGenericArguments()[0];
-                
-                var expr = GetFuncExpressionForResolvingType(targetType);
-                var ci = ctx.ResolvingType.GetConstructor(new Type[] {typeof (Func<>).MakeGenericType(targetType), typeof (bool)});
-                Type fType = Expression.GetFuncType(ctx.ResolvingType);
-                var createdFunc = Expression.Lambda(fType,Expression.New(ci, expr, Expression.Constant(true)));
-                var func = (Func<object>) createdFunc.Compile();
-                return func;
-
-            }, new InnerTypeDependencyScope());
-
-
-            //rozsireni pro podporu IEnumerable
-            this.RegisterType(typeof(IEnumerable<>), ctx =>
-            {
-                var targetType = ctx.ResolvingType.GetGenericArguments()[0];
-                
-                var This = Expression.Constant(this); //opravdu konstanta ?
-                Type fTyp = Expression.GetFuncType(ctx.ResolvingType);
-                var exp = Expression.Call(This, "GetServices", new Type[] { targetType });
-                LambdaExpression result = Expression.Lambda(fTyp, exp);
-                var f1 = (Func<object>)result.Compile();
-                return f1;
-                
-               
-
-            }, TransientScope.Instance);
-            
-        }
-
-       
-
+        
         /// <summary>
-        /// Vrací výraz pro resolvovací funkcí.
+        /// Creates new DI container. If <paramref name="configurationManager"/> is not specified, the default one is used.
         /// </summary>
-        /// <param name="pluginType"></param>
-        /// <returns></returns>
-        private LambdaExpression GetFuncExpressionForResolvingType(Type pluginType)
+        /// <param name="configurationManager"></param>
+        public PerunContainer(PerunContainerConfigurationManager configurationManager = null)
         {
-            var This = Expression.Constant(this); //opravdu konstanta ?
-            Type fType = Expression.GetFuncType(pluginType);
-            var exp = Expression.Call(This, "GetService", new Type[] { pluginType });
-            LambdaExpression result = Expression.Lambda(fType, exp);
-            return result;
-                                                         
+            ConfigurationManager = configurationManager ?? new PerunContainerConfigurationManager(this);
+            
+            ConfigurationManager.Configure();
         }
 
         /// <summary>
-        /// Vrací konstrukční funkci a to tak, ze vybira konstruktor s nejvetsim poctem parametru
+        /// Gets current configuration manager used for this container.
         /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="t"></param>
-        /// <returns></returns>
-        private Func<T> GetBuildUpFunc<T>(Type t)
-        {
-            
-            var ctors = t.GetConstructors();
-            var ci = ctors.OrderByDescending(x => x.GetParameters().Length).FirstOrDefault(); //todo: co kdyz zadny neni
-            var This = Expression.Constant(this); //todo opravdu konstanta ?
-            IEnumerable<Expression> exprs =
-                ci.GetParameters().Select(x => Expression.Call(This, "GetService", new Type[] { x.ParameterType }));
-            var tmp = exprs.ToList(); //todo: odstranit
-            var createFunc = Expression.Lambda<Func<T>>(System.Linq.Expressions.Expression.New(ci, exprs));
-            return createFunc.Compile();
-        }
+        /// <remarks>
+        /// (This mannager is set when you create <see cref="PerunContainer"/>, see constructor)
+        /// </remarks>
+        public readonly PerunContainerConfigurationManager ConfigurationManager; 
 
        
 
-        public bool IsConfiguredFor(Type interfaceType)
+        #region 'Query' methods
+        /// <summary>
+        /// Returns <c>true</c> if this plugin type is registered.
+        /// </summary>
+        /// <param name="pluginType">pluginType (ussually interface type)</param>
+        /// <returns></returns>
+        public bool IsConfiguredFor(Type pluginType)
         {
-            return _all.ContainsKey(interfaceType);
+            return _all.ContainsKey(pluginType);
         }
 
+        /// <summary>
+        ///  Returns <c>true</c> if this plugin type is registered.
+        /// </summary>
+        /// <typeparam name="T">pluginType (ussually interface type)</typeparam>
+        /// <returns></returns>
         public bool IsConfiguredFor<T>()
         {
             return _all.ContainsKey(typeof(T));
         }
+        #endregion
+        #region GetService(s) Methods
 
+        /// <summary>
+        /// Returns default service determined by their pluginType
+        /// </summary>
+        /// <typeparam name="T">pluginType (ussually interface type)</typeparam>
+        /// <returns></returns>
         public T GetService<T>()
         {
             return (T) GetService(typeof (T));
         }
 
-        public object GetService(Type t)
+        /// <summary>
+        /// Returns default service determined by their pluginType
+        /// </summary>
+        /// <param name="pluginType">pluginType (ussually interface type)</param>
+        /// <returns></returns>
+        public object GetService(Type pluginType)
         {
 
             List<IImplementationBuilder> impls;
-            if (!_all.TryGetValue(t, out impls) ) 
+            if (!_all.TryGetValue(pluginType, out impls) ) 
             {
                 //resolving generic by opened generic deftype 
-                if (t.IsGenericType)
+                if (pluginType.IsGenericType)
                 {
-                    var gd = t.GetGenericTypeDefinition();
+                    var gd = pluginType.GetGenericTypeDefinition();
                     if (!_all.TryGetValue(gd, out impls))
                     {
                         return null;
                     }
                 }
             }
-            var ctx = new BuildingContext(t, this);
+            var ctx = new BuildingContext(pluginType, this);
             var result = impls[0].Get(ctx); //first is default
             return result;
         }
 
-      
-
-
-
-
-
+        
+        /// <summary>
+        /// Returns all services determined by their pluginType
+        /// </summary>
+        /// <typeparam name="T">pluginType (ussually interface type)</typeparam>
+        /// <returns></returns>
         public IEnumerable<T> GetServices<T>()
         {
             return GetServices(typeof (T)).Cast<T>();
-           
         }
 
-        public IEnumerable<object> GetServices(Type t)
+        /// <summary>
+        /// Returns all services determined by their pluginType
+        /// </summary>
+        /// <param name="pluginType">pluginType (ussually interface type)</param>
+        /// <returns></returns>
+        public IEnumerable<object> GetServices(Type pluginType)
         {
             BuildingContext ctx = null; 
             List<IImplementationBuilder> impls;
             List<OpenedImplementationBuilder> implsToSkip = null; 
-            if (_all.TryGetValue(t, out impls))
+            if (_all.TryGetValue(pluginType, out impls))
             {
-                ctx = new BuildingContext(t, this);
+                ctx = new BuildingContext(pluginType, this);
                 //protoze zavolani 'i.Get(ctx)' muze zpusobit pridani dalsich definic do kolekce impls, 
                 //pouzivame 'for' a vzdy znovuvyhodnocujeme celkovy pocet
                 // ReSharper disable ForCanBeConvertedToForeach
@@ -235,14 +144,14 @@ namespace Agama.Perun
             }
 
             //resolving generic by opened generic deftype 
-            if (t.IsGenericType)
+            if (pluginType.IsGenericType)
             {
-                var gd = t.GetGenericTypeDefinition();
+                var gd = pluginType.GetGenericTypeDefinition();
 
                 if (_all.TryGetValue(gd, out impls))
                 {
                     if (ctx==null)
-                        ctx = new BuildingContext(t,this);
+                        ctx = new BuildingContext(pluginType,this);
                     
                     //protoze zavolani 'i.Get(ctx)' muze zpusobit pridani dalsich definic do kolekce impls, 
                     //pouzivame 'for' a vzdy znovuvyhodnocujeme celkovy pocet
@@ -260,27 +169,29 @@ namespace Agama.Perun
             yield break;
 
         }
+        #endregion
 
-     
+        #region RegisterType Methods..
 
-        public void RegisterType<TReal>(IPerunScope scope )
+        public IResolver RegisterType<TReal>(IPerunScope scope = null)
         {
-            RegisterType<TReal>(CreateFunc<TReal, TReal>(), scope);
+            return RegisterType<TReal>(CreateFunc<TReal, TReal>(), scope ?? TransientScope.Instance);
         }
 
-        public void RegisterType<TInterface, TReal>(IPerunScope scope) where TReal : TInterface
+        public IResolver RegisterType<TInterface, TReal>(IPerunScope scope = null) where TReal : TInterface
         {
-            RegisterType<TInterface>(CreateFunc<TInterface,TReal>(), scope);
+            return RegisterType<TInterface>(CreateFunc<TInterface,TReal>(), scope ?? TransientScope.Instance);
         }
 
-       public void RegisterType<TInterface>(Func<TInterface> builder,IPerunScope scope)
+        public IResolver RegisterType<TInterface>(Func<TInterface> builder, IPerunScope scope = null)
        {
-           RegisterType<TInterface>(CreateFunc(builder),scope);
+           return RegisterType<TInterface>(CreateFunc(builder),scope ?? TransientScope.Instance);
+           
        }
 
        
 
-        public void RegisterType<TInterface>(Func<BuildingContext,TInterface> builder,IPerunScope scope)
+        public IResolver RegisterType<TInterface>(Func<BuildingContext,TInterface> builder,IPerunScope scope = null)
         {
             List<IImplementationBuilder> implementators;
             var interfaceType = typeof (TInterface);
@@ -290,88 +201,72 @@ namespace Agama.Perun
                 _all.Add(interfaceType, implementators);
             }
 
-            var impl = new ImplementationBuilder<TInterface>(_scoppings, builder,scope);
+            var impl = new ImplementationBuilder<TInterface>(_scoppings, builder,scope ?? TransientScope.Instance);
             implementators.Add(impl);
+            return impl;
         }
 
-       
 
-        public void RegisterType(Type type, Type @interface, IPerunScope scope)
+
+        public IResolver RegisterType(Type type, Type @interface = null, IPerunScope scope = null)
         {
-            RegisterType(@interface ?? type,CreateFunc(type),scope);
+           return RegisterType(@interface ?? type,CreateFunc(type),scope ?? TransientScope.Instance);
         }
 
-       
 
-        /// <summary>
-        /// Pomocná metoda, která má za ukol obalit puvodni funkci, tak aby zavisela na kontextu
-        /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="innerFunc"></param>
-        /// <returns></returns>
-        private Func<BuildingContext, T> CreateFunc<T>(Func<T> innerFunc )
+
+        public IResolver RegisterType(Type interfaceType, Func<object> builder, IPerunScope scope = null)
         {
-            return ctx => innerFunc(); //carrying 
+            return RegisterType(interfaceType, CreateFunc(builder), scope ?? TransientScope.Instance);
         }
 
 
-        private Func<BuildingContext,object> CreateFunc(Type type)
-        {
-            //todo : najit spravny ctor
-            if (!type.IsGenericTypeDefinition)
-            {
-                //vytvoreni funkce na zaklade typu
-                return CreateFunc(GetBuildUpFunc<object>(type));
-            }
-            else
-            {
-                Func<BuildingContext, object> f = delegate(BuildingContext ctx)
-                                                      {
-                                                          var genType = type.MakeGenericType(ctx.ResolvingType.GetGenericArguments());
-                                                          var createFunc = GetBuildUpFunc<object>(genType);
-                                                          //this.RegisterType(ctx.ResolvingType,);
-                                                          return createFunc;
 
-                                                      };
-                return f;
-            }
-            
-        }
-
-        
-      
-
-        private Func<TInterface> CreateFunc<TInterface, TReal>()
-        {
-            return this.GetBuildUpFunc<TInterface>(typeof (TReal));
-        }
-
-        
-     
-     
-
-        public void RegisterType(Type interfaceType, Func<object> builder,IPerunScope scope)
-        {
-            RegisterType(interfaceType, CreateFunc(builder), scope);
-        }
-       
-        
-
-        public void RegisterType(Type interfaceType, Func<BuildingContext,object> builder,IPerunScope scope)
+        public IResolver RegisterType(Type interfaceType, Func<BuildingContext, object> builder, IPerunScope scope = null)
         {
            
 
             IImplementationBuilder impl;
             if (interfaceType.IsGenericTypeDefinition)
-                impl = new OpenedImplementationBuilder(_scoppings, interfaceType, builder, scope);
-            else impl = new ImplementationBuilder(_scoppings, interfaceType, builder, scope);
+                impl = new OpenedImplementationBuilder(_scoppings, interfaceType, builder, scope ?? TransientScope.Instance);
+            else impl = new ImplementationBuilder(_scoppings, interfaceType, builder, scope ?? TransientScope.Instance);
 
-            RegisterInternal(interfaceType,impl);
+            return RegisterInternal(interfaceType,impl);
 
             
         }
+        #endregion
 
-        internal void RegisterInternal(Type interfaceType, IImplementationBuilder builder, Tuple<OpenedImplementationBuilder, ImplementationBuilder> callerToReplace = null)
+        #region Eject & Remove & Dispose Methods
+
+        public void EjectServices(IPerunScope scope)
+        {
+            var scopeObject = scope.Context;
+            if (scopeObject != null)
+            {
+                _scoppings.RemoveAll(x => x.Equals(scopeObject));
+
+            }
+        }
+
+        public void DisposeService(Type interfaceType)
+        {
+            List<IImplementationBuilder> implementators;
+            if (_all.TryGetValue(interfaceType, out implementators))
+            {
+                _all.Remove(interfaceType);
+
+                foreach (var i in implementators)
+                {
+                    i.Dispose();
+                }
+            }
+
+        }
+
+
+        #endregion
+        internal IImplementationBuilder RegisterInternal(Type interfaceType, IImplementationBuilder builder, Tuple<OpenedImplementationBuilder, ImplementationBuilder> callerToReplace = null)
         {
             List<IImplementationBuilder> implementators;
             if (!_all.TryGetValue(interfaceType, out implementators))
@@ -408,44 +303,80 @@ namespace Agama.Perun
                                             );
                     if (indexToReplace >= 0)
                         implementators[indexToReplace] = callerToReplace.Item2;
-                    return;
+                    return null; //neni potreba nic vracet pokud callerToReplace!=null
                 }
             }
 
             implementators.Add(builder);//jinak ji pridame na konec
+            return builder;
         }
 
-        public void EjectServices(IPerunScope scope)
+
+        /// <summary>
+        /// Pomocná metoda, která má za ukol obalit puvodni funkci, tak aby zavisela na kontextu
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="innerFunc"></param>
+        /// <returns></returns>
+        private Func<BuildingContext, T> CreateFunc<T>(Func<T> innerFunc)
         {
-            var scopeObject =scope.Context;
-            if (scopeObject != null)
+            return ctx => innerFunc(); //carrying 
+        }
+
+
+        private Func<BuildingContext, object> CreateFunc(Type type)
+        {
+            //todo : najit spravny ctor
+            if (!type.IsGenericTypeDefinition)
             {
-                _scoppings.RemoveAll(x=>x.Equals(scopeObject));
-                
+                //vytvoreni funkce na zaklade typu
+                return CreateFunc(GetBuildUpFunc<object>(type));
             }
-        }
-
-        public void DisposeService(Type interfaceType)
-        {
-            List<IImplementationBuilder> implementators;
-            if (_all.TryGetValue(interfaceType, out implementators))
+            else
             {
-                _all.Remove(interfaceType);
-                
-                foreach (var i in implementators)
+                Func<BuildingContext, object> f = delegate(BuildingContext ctx)
                 {
-                    i.Dispose();
-                }
+                    var genType = type.MakeGenericType(ctx.ResolvingType.GetGenericArguments());
+                    var createFunc = GetBuildUpFunc<object>(genType);
+                    //this.RegisterType(ctx.ResolvingType,);
+                    return createFunc;
+
+                };
+                return f;
             }
-           
+
         }
-       
 
 
-        
+         
+
+        private Func<TInterface> CreateFunc<TInterface, TReal>()
+        {
+            return this.GetBuildUpFunc<TInterface>(typeof(TReal));
+        }
 
 
-       
+        /// <summary>
+        /// Vrací konstrukční funkci a to tak, ze vybira konstruktor s nejvetsim poctem parametru
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="t"></param>
+        /// <returns></returns>
+        private Func<T> GetBuildUpFunc<T>(Type t)
+        {
+
+            var ctors = t.GetConstructors();
+            var ci = ctors.OrderByDescending(x => x.GetParameters().Length).FirstOrDefault(); //todo: co kdyz zadny neni
+            var This = Expression.Constant(this);
+            IEnumerable<Expression> exprs =
+                ci.GetParameters().Select(x => Expression.Call(This, "GetService", new Type[] { x.ParameterType }));
+            var createFunc = Expression.Lambda<Func<T>>(System.Linq.Expressions.Expression.New(ci, exprs));
+            return createFunc.Compile();
+        }
+
+
+
+
 
         object IPerunScope.Context
         {

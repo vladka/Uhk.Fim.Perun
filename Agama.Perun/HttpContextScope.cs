@@ -3,6 +3,9 @@ using System.Web;
 
 namespace Agama.Perun
 {
+    /// <summary>
+    /// Lifecycle per web request: There will be one instance per one  <see cref="HttpContext.Current"/>.
+    /// </summary>
     public class HttpContextScope : IPerunScope
     {
 

@@ -4,7 +4,9 @@ using System.Threading;
 namespace Agama.Perun
 {
     /// <summary>
-    /// Class providing life cycles per thread.
+    /// Class providing life cycles per thread, 
+    /// if you have 2 threads, ther will be only 2 instances in your application.
+    /// (Use this class is singleton (<see cref="Instance"/>))
     /// </summary>
     public class ThreadScope : IPerunScope
     {
