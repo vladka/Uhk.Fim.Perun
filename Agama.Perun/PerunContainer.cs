@@ -113,10 +113,6 @@ namespace Agama.Perun
                 
                 //var expr = GetFuncExpressionForResolvingType(targetType);
                 //var ci = ctx.ResolvingType.GetConstructor(new Type[] { typeof(Func<>).MakeGenericType(targetType), typeof(bool) });
-                //Type fType = Expression.GetFuncType(ctx.ResolvingType);
-                //var createdFunc = Expression.Lambda(fType, Expression.New(ci, expr, Expression.Constant(true)));
-                //var func = (Func<object>)createdFunc.Compile();
-                //return func;
 
             }, TransientScope.Instance);
             
