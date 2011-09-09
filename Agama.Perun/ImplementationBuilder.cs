@@ -8,20 +8,20 @@ namespace Agama.Perun
     public class ImplementationBuilder<TPluginType> : IImplementationBuilder
     {
 
-        private readonly ScoppingRegistration _scoppingRegistration;
+        
+        private readonly PerunContainer _container;
         private readonly Func<BuildingContext, TPluginType> _factoryMethod;
         private readonly IPerunScope _scope;
         private readonly ScopedValuesCollection _scopedValues;
+        private readonly Type _pluginType;
 
-
-        internal ImplementationBuilder(ScoppingRegistration scoppingRegistration, Func<BuildingContext, TPluginType> factoryMethod, IPerunScope scope)
+        internal ImplementationBuilder(PerunContainer container, Func<BuildingContext, TPluginType> factoryMethod, IPerunScope scope)
         {
-
-            _scoppingRegistration = scoppingRegistration;
+            _container = container;
             _factoryMethod = factoryMethod;
             _scope = scope;
-            _scopedValues = new ScopedValuesCollection(scoppingRegistration);
-
+            _scopedValues = new ScopedValuesCollection(_container._scoppings);
+            _pluginType = typeof (TPluginType); //to be quick
 
         }
 
@@ -43,6 +43,17 @@ namespace Agama.Perun
             get
             {
                 return _scope;
+            }
+        }
+
+        /// <summary>
+        /// Type for what is this instance defined
+        /// </summary>
+        public Type PluginType
+        {
+            get
+            {
+                return _pluginType;
             }
         }
 
@@ -81,6 +92,17 @@ namespace Agama.Perun
         object IImplementationBuilder.Get(BuildingContext ctx)
         {
             return Get(ctx);
+        }
+
+
+        /// <summary>
+        /// Pokusi se vyjmout definici. Pouze ji vyjme a neprovadi dispose na drzenych objektech.
+        /// Defakto dojde pouze k odstraneni definice, ale veskere zijici komponenty jsou ponechany nazivu, dokud plati jejich scope.
+        /// (Porovnej s <see cref="Dispose"/>, která naopak ruší sebe včetně toho, že volá Dispose na všech držených komponentách.)
+        /// </summary>
+        public void UnRegister()
+        {
+            _container.UnRegister(this);
         }
 
         #region Dispose Block
@@ -125,9 +147,8 @@ namespace Agama.Perun
     /// </summary>
     public class ImplementationBuilder : IImplementationBuilder
     {
-
+        private readonly PerunContainer _container;
         public readonly OpenedImplementationBuilder Creator;
-        private readonly ScoppingRegistration _scoppingRegistration;
         private readonly Type _pluginType;
         private readonly Func<BuildingContext, object> _factoryMethod;
         private readonly IPerunScope _scope;
@@ -135,16 +156,17 @@ namespace Agama.Perun
         private readonly ScopedValuesCollection _scopedValues;
 
 
-        internal ImplementationBuilder(ScoppingRegistration scoppingRegistration, Type pluginType, Func<BuildingContext, object> factoryMethod, IPerunScope scope, OpenedImplementationBuilder creator = null)
+        internal ImplementationBuilder(PerunContainer container, Type pluginType, Func<BuildingContext, object> factoryMethod, IPerunScope scope, OpenedImplementationBuilder creator = null)
         {
+            _container = container;
             Creator = creator;
 
-            _scoppingRegistration = scoppingRegistration;
+            
             _pluginType = pluginType;
             _factoryMethod = factoryMethod;
             _scope = scope;
             _creator = creator;
-            _scopedValues = new ScopedValuesCollection(scoppingRegistration);
+            _scopedValues = new ScopedValuesCollection(_container._scoppings);
 
 
         }
@@ -167,6 +189,16 @@ namespace Agama.Perun
             get
             {
                 return _scope;
+            }
+        }
+        /// <summary>
+        /// Type for what is this instance defined
+        /// </summary>
+        public Type PluginType
+        {
+            get
+            {
+                return _pluginType;
             }
         }
 
@@ -225,6 +257,17 @@ namespace Agama.Perun
             return args3.Component;
         }
 
+        
+        
+        /// <summary>
+        /// Pokusi se vyjmout definici. Pouze ji vyjme a neprovadi dispose na drzenych objektech.
+        /// Defakto dojde pouze k odstraneni definice, ale veskere zijici komponenty jsou ponechany nazivu, dokud plati jejich scope.
+        /// (Porovnej s <see cref="Dispose"/>, která naopak ruší sebe včetně toho, že volá Dispose na všech držených komponentách.)
+        /// </summary>
+        public void UnRegister()
+        {
+            _container.UnRegister(this);
+        }
 
         #region Dispose Block
         /// <summary>
@@ -248,8 +291,10 @@ namespace Agama.Perun
 
             Disposed = true;
             _scopedValues.Dispose();
+            _container.UnRegister(this);
             AfterBuiltNewComponent = null;
             AfterGotScoped = null;
+            
             
             
         }

@@ -7,10 +7,12 @@ namespace Agama.Perun
     /// </summary>
     public sealed class RedirectImplementationBuilder : IImplementationBuilder
     {
+        private readonly Type _pluginType;
         public readonly OpenedImplementationBuilder Target;
 
-        internal RedirectImplementationBuilder(OpenedImplementationBuilder target)
+        internal RedirectImplementationBuilder(Type pluginType,OpenedImplementationBuilder target)
         {
+            _pluginType = pluginType;
             Target = target;
         }
 
@@ -35,6 +37,20 @@ namespace Agama.Perun
         public IPerunScope Scope
         {
             get { return Target.Scope; }
+        }
+
+        public Type PluginType
+        {
+            get { return this._pluginType; }
+        }
+
+        /// <summary>
+        /// Nedela nic v teto implementaci
+        /// </summary>
+        public void UnRegister()
+        {
+            //nedela nic, protoze RedirectImplementation nejde vyrobit primo uzivatelem, ale je vyrabena automaticky.
+            //neni tedy potrena ji oderegistrovát.
         }
 
           #region Dispose Block

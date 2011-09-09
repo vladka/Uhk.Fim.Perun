@@ -12,7 +12,7 @@ namespace Agama.Perun
     {
         
         internal readonly Dictionary<Type,List<IImplementationBuilder>> _all = new Dictionary<Type, List<IImplementationBuilder>>();
-        private ScoppingRegistration _scoppings = new ScoppingRegistration();
+        internal ScoppingRegistration _scoppings = new ScoppingRegistration();
         private readonly Dictionary<Type, Type> _cache= new Dictionary<Type, Type>();
 
         
@@ -45,7 +45,7 @@ namespace Agama.Perun
         /// <returns></returns>
         public bool IsConfiguredFor(Type pluginType)
         {
-            return _all.ContainsKey(pluginType);
+            return _all.ContainsKey(pluginType);//todo: co genericke otevrene definice
         }
 
         /// <summary>
@@ -55,7 +55,7 @@ namespace Agama.Perun
         /// <returns></returns>
         public bool IsConfiguredFor<T>()
         {
-            return _all.ContainsKey(typeof(T));
+            return _all.ContainsKey(typeof(T));//todo: co genericke otevrene definice
         }
         #endregion
         #region GetService(s) Methods
@@ -201,7 +201,7 @@ namespace Agama.Perun
                 _all.Add(interfaceType, implementators);
             }
 
-            var impl = new ImplementationBuilder<TInterface>(_scoppings, builder,scope ?? TransientScope.Instance);
+            var impl = new ImplementationBuilder<TInterface>(this, builder,scope ?? TransientScope.Instance);
             implementators.Add(impl);
             return impl;
         }
@@ -228,8 +228,8 @@ namespace Agama.Perun
 
             IImplementationBuilder impl;
             if (interfaceType.IsGenericTypeDefinition)
-                impl = new OpenedImplementationBuilder(_scoppings, interfaceType, builder, scope ?? TransientScope.Instance);
-            else impl = new ImplementationBuilder(_scoppings, interfaceType, builder, scope ?? TransientScope.Instance);
+                impl = new OpenedImplementationBuilder(this, interfaceType, builder, scope ?? TransientScope.Instance);
+            else impl = new ImplementationBuilder(this, interfaceType, builder, scope ?? TransientScope.Instance);
 
             return RegisterInternal(interfaceType,impl);
 
@@ -249,18 +249,63 @@ namespace Agama.Perun
             }
         }
 
-        public void DisposeService(Type interfaceType)
+        /// <summary>
+        /// Unregister all components by given pluginType.
+        /// Every IDisposable component is disposed. 
+        /// (<seealso cref="UnRegister"/> which keep components alive).
+        /// If pluginType is set by opened generic definition (e.g. typeof(IList&lt;&gt;), this this plugin is kept.
+        /// </summary>
+        /// <param name="pluginType"></param>
+        public void DisposeService(Type pluginType)
         {
             List<IImplementationBuilder> implementators;
-            if (_all.TryGetValue(interfaceType, out implementators))
+            if (_all.TryGetValue(pluginType, out implementators))
             {
-                _all.Remove(interfaceType);
-
+                
                 foreach (var i in implementators)
                 {
+                    var ib = i as ImplementationBuilder;
+                    if (ib!=null && ib.Creator!=null)
+                        continue;
                     i.Dispose();
                 }
+
+                
             }
+            
+        }
+
+        
+        /// <summary>
+        /// Try to remove definition, all components keep alive.
+        /// Pokusi se vyjmout definici. Pouze ji vyjme a neprovadi dispose na drzenych objektech, jinak by doslo k zacykleni.
+        /// Defakto dojde pouze k odstraneni definice, ale veskere zijici komponenty jsou ponechany nazivu, dokud plati jejich scope.
+        /// Pokud builder je typu <see cref="OpenedImplementationBuilder"/>, pak jsou odregistrovani i vsichni uzavrene genericke definice vychazejici z tohoto buildru.
+        /// </summary>
+        /// <param name="builder"></param>
+        internal void UnRegister(IImplementationBuilder builder)
+        {
+            List<IImplementationBuilder> implementators;
+            if (!this._all.TryGetValue(builder.PluginType, out implementators))
+                return;
+            var ob = builder as OpenedImplementationBuilder;
+            if (ob != null)
+            {
+                //odregistrovani i konkretnich generickych potomku vychazejicich z otevrene genericke definice
+                List<IImplementationBuilder> toRemoveList = (from i in implementators
+                                                         let ib = i as ImplementationBuilder
+                                                         where ib != null && ib.Creator == builder
+                                                         select i).ToList();
+                toRemoveList.ForEach(x=>implementators.Remove(x));
+                return;
+            }
+
+            //=> it is ImplementationBuilder, it is only once
+            var toRemove = implementators.Find(x => builder == x);
+            if (toRemove == null)
+                return;
+            implementators.Remove(toRemove);
+
 
         }
 
@@ -284,7 +329,7 @@ namespace Agama.Perun
                     if (_all.TryGetValue(interfaceType.GetGenericTypeDefinition(), out openedImplementators))
                     {
                         implementators.Add(
-                            new RedirectImplementationBuilder((OpenedImplementationBuilder) openedImplementators[0]));
+                            new RedirectImplementationBuilder(interfaceType,(OpenedImplementationBuilder) openedImplementators[0]));
                     }
                 }
             }
@@ -373,7 +418,6 @@ namespace Agama.Perun
             var createFunc = Expression.Lambda<Func<T>>(System.Linq.Expressions.Expression.New(ci, exprs));
             return createFunc.Compile();
         }
-
 
 
 

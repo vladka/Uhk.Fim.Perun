@@ -13,15 +13,16 @@ namespace Agama.Perun
     {
 
         private readonly ScoppingRegistration _scoppingRegistration;
+        private readonly PerunContainer _container;
         private readonly Type _pluginType;
         private readonly Func<BuildingContext, object> _factoryMethod;
         private readonly IPerunScope _scope;
         
 
 
-        internal  OpenedImplementationBuilder(ScoppingRegistration scoppingRegistration, Type pluginType, Func<BuildingContext, object> factoryMethod, IPerunScope scope)
+        internal  OpenedImplementationBuilder(PerunContainer container, Type pluginType, Func<BuildingContext, object> factoryMethod, IPerunScope scope)
         {
-            _scoppingRegistration = scoppingRegistration;
+            _container = container;
             _pluginType = pluginType;
             _factoryMethod = factoryMethod;
             _scope = scope;
@@ -32,6 +33,17 @@ namespace Agama.Perun
             get
             {
                 return _scope;
+            }
+        }
+
+        /// <summary>
+        /// Type for what is this instance defined
+        /// </summary>
+        public Type PluginType
+        {
+            get
+            {
+                return _pluginType;
             }
         }
 
@@ -59,12 +71,23 @@ namespace Agama.Perun
 
             var finalFunc = (Func<object>) _factoryMethod(ctx);
             
-            var closedBuilder = new ImplementationBuilder(_scoppingRegistration,ctx.ResolvingType,c => finalFunc(),lz!=null ? lz.FinalScope : _scope,this);
+            var closedBuilder = new ImplementationBuilder(_container,ctx.ResolvingType,c => finalFunc(),lz!=null ? lz.FinalScope : _scope,this);
 
             ctx.Container.RegisterInternal(ctx.ResolvingType, closedBuilder,new Tuple<OpenedImplementationBuilder,ImplementationBuilder> (this,closedBuilder));
 
             var result = ctx.Container.GetService(ctx.ResolvingType);
             return result;
+            
+        }
+
+        /// <summary>
+        /// Pokusi se vyjmout definici. Pouze ji vyjme a neprovadi dispose na drzenych objektech.
+        /// Defakto dojde pouze k odstraneni definice, ale veskere zijici komponenty jsou ponechany nazivu, dokud plati jejich scope.
+        /// (Porovnej s <see cref="Dispose"/>, která naopak ruší sebe včetně toho, že volá Dispose na všech držených komponentách.)
+        /// </summary>
+        public void UnRegister()
+        {
+            _container.UnRegister(this);
             
         }
 
