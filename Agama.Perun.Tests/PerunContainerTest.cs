@@ -73,6 +73,9 @@ namespace Agama.Perun.Tests
             DisposePlugins();
         }
 
+
+        
+
         /// <summary>
         /// Test, zda pri vyjmuti pluginu dojde k dojde k disposnutí držených instancí.
         /// </summary>

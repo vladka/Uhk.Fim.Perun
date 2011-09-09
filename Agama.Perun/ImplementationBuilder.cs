@@ -126,6 +126,7 @@ namespace Agama.Perun
                 return;
             Disposed = true;
             _scopedValues.Dispose();
+            _container.UnRegister(this);
             AfterBuiltNewComponent = null;
             AfterGotScoped = null;
             

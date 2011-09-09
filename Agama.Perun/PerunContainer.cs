@@ -261,14 +261,12 @@ namespace Agama.Perun
             List<IImplementationBuilder> implementators;
             if (_all.TryGetValue(pluginType, out implementators))
             {
-                
-                foreach (var i in implementators)
-                {
-                    var ib = i as ImplementationBuilder;
-                    if (ib!=null && ib.Creator!=null)
-                        continue;
-                    i.Dispose();
-                }
+                var toDispose = (from i in implementators
+                                 let ib = i as ImplementationBuilder
+                                 where ib == null || ib.Creator == null
+                                 select i).ToList();
+                //to avoid Ienumerable modified exception
+                toDispose.ForEach(x=>x.Dispose());
 
                 
             }
@@ -305,6 +303,9 @@ namespace Agama.Perun
             if (toRemove == null)
                 return;
             implementators.Remove(toRemove);
+
+            if (implementators.Count == 0)
+                this._all.Remove(builder.PluginType);
 
 
         }
