@@ -64,21 +64,21 @@ namespace Agama.Perun
             var t = Expression.Constant(this);
             //rozsireni pro podporu Func
             this.RegisterType(typeof(Func<>),ctx =>
-                                                      {
-                                                         var targetType = ctx.ResolvingType.GetGenericArguments()[0];
-                                                         Func<object> res = delegate()
-                                                                              {
-                                                                                  var fce = GetFuncExpressionForResolvingType(targetType).Compile();
-                                                                                  return fce;
-                                                                              };
-                                                          return res; //fce vracící fci
-                                                         
-                                                         // Type fType = Expression.GetFuncType(targetType);
-                                                         //var exp = Expression.Call(t, "GetService",new Type[] {targetType});
-                                                         //LambdaExpression result = Expression.Lambda(fType, exp);
-                                                         //Delegate compiled = result.Compile();
-                                                         //return compiled;
-                                                     },new InnerTypeDependencyScope());
+             {
+                var targetType = ctx.ResolvingType.GetGenericArguments()[0];
+                Func<object> res = delegate()
+                                     {
+                                         var fce = GetFuncExpressionForResolvingType(targetType).Compile();
+                                         return fce;
+                                     };
+                 return res; //fce vracící fci
+                
+                // Type fType = Expression.GetFuncType(targetType);
+                //var exp = Expression.Call(t, "GetService",new Type[] {targetType});
+                //LambdaExpression result = Expression.Lambda(fType, exp);
+                //Delegate compiled = result.Compile();
+                //return compiled;
+            },new InnerTypeDependencyScope());
 
 
 
@@ -97,7 +97,28 @@ namespace Agama.Perun
                 return func;
 
             }, new InnerTypeDependencyScope());
-            
+
+
+            //rozsireni pro podporu IEnumerable
+            this.RegisterType(typeof(IEnumerable<>), ctx =>
+            {
+                var targetType = ctx.ResolvingType.GetGenericArguments()[0];
+                
+                var This = Expression.Constant(this); //opravdu konstanta ?
+                Type fTyp = Expression.GetFuncType(ctx.ResolvingType);
+                var exp = Expression.Call(This, "GetServices", new Type[] { targetType });
+                LambdaExpression result = Expression.Lambda(fTyp, exp);
+                var f1 = (Func<object>)result.Compile();
+                return f1;
+                
+                //var expr = GetFuncExpressionForResolvingType(targetType);
+                //var ci = ctx.ResolvingType.GetConstructor(new Type[] { typeof(Func<>).MakeGenericType(targetType), typeof(bool) });
+                //Type fType = Expression.GetFuncType(ctx.ResolvingType);
+                //var createdFunc = Expression.Lambda(fType, Expression.New(ci, expr, Expression.Constant(true)));
+                //var func = (Func<object>)createdFunc.Compile();
+                //return func;
+
+            }, TransientScope.Instance);
             
         }
 
@@ -364,10 +385,11 @@ namespace Agama.Perun
                 _all.Add(interfaceType, implementators);
 
 
-                if (interfaceType.IsGenericType && (!interfaceType.IsGenericTypeDefinition))
+                if (callerToReplace==null && interfaceType.IsGenericType && (!interfaceType.IsGenericTypeDefinition))
                 {
                     //pokud definujeme genericky typ, ale uz je definovan predpis pro otevreny genericky typ, 
                     //tak tento otevreny musi zustat jako defaultni
+                    //Tuto vetev vsak nevolame, pokud jde o zakladani volane otevrene definice (callerToReplace==null)
                     List<IImplementationBuilder> openedImplementators;
                     if (_all.TryGetValue(interfaceType.GetGenericTypeDefinition(), out openedImplementators))
                     {
