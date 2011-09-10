@@ -64,6 +64,57 @@ namespace Agama.Perun.Tests
         #endregion
 
 
+
+        /// <summary>
+        ///A test for Dispose
+        ///</summary>
+        [TestMethod()]
+        public void Test001()
+        {
+            bool disposed = false;
+            bool created = false;
+            using (var ioc = new PerunContainer())
+             {
+                 var regInfo = ioc.RegisterType<ITestDisposable, TestDisposableClass>(ioc);
+                 regInfo.AfterBuiltNewComponent += (sender, args) =>
+                                                       {
+                                                           created = true;
+                                                           ((TestDisposableClass) args.Component).BeforeDisposeAction =
+                                                               () => disposed = true;
+                                                       };
+                 var myComponent = ioc.GetService<ITestDisposable>();
+                 Assert.IsTrue(created); 
+                 regInfo.Dispose();
+
+                 Assert.IsTrue(disposed);
+                 Assert.IsFalse(ioc.IsConfiguredFor(typeof(ITestDisposable)));
+             }
+        }
+
+        /// <summary>
+        ///A test for Dispose
+        ///</summary>
+        [TestMethod()]
+        public void Test002()
+        {
+           
+            using (var ioc = new PerunContainer())
+            {
+                ioc.AfterMissedComponent += (sender, args) =>
+                                                {
+                                                    if (args.RequieredComponentType == typeof(ITestDisposable))
+                                                        ioc.RegisterType<ITestDisposable, TestDisposableClass>();
+                                                            
+                                                };
+                
+                var myComponent = ioc.GetService<ITestDisposable>();
+                Assert.IsNotNull(myComponent);
+
+            }
+        }
+       
+
+
         /// <summary>
         ///A test for Dispose
         ///</summary>
@@ -85,7 +136,7 @@ namespace Agama.Perun.Tests
             using (var ioc = new PerunContainer())
             {
 
-                ioc.RegisterType<ITestDisposable, TestDisposableClass>(ioc);
+                ioc.RegisterType<ITestDisposable, TestDisposableClass>(ioc); //as singleton /* PerunConatiner implements IPersunScope*/
                 var a = ioc.GetService<ITestDisposable>();
                 a.BeforeDisposeAction = () => disposed = true;
 

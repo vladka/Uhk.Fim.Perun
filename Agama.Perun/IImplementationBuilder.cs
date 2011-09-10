@@ -2,7 +2,7 @@
 
 namespace Agama.Perun
 {
-    internal interface  IImplementationBuilder:IResolver
+    internal interface  IImplementationBuilder< T>:IConfiguredPluginInfo<T>
     {
 
         object Get(BuildingContext ctx);

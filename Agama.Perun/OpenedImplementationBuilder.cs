@@ -9,7 +9,7 @@ namespace Agama.Perun
     ///  (<see cref="ImplementationBuilder"/> or <see cref="ImplementationBuilder{TPluginType}"/>).
     /// 
     /// </summary>
-    public sealed class OpenedImplementationBuilder : IImplementationBuilder
+    public sealed class OpenedImplementationBuilder : IImplementationBuilder<object >
     {
 
         private readonly ScoppingRegistration _scoppingRegistration;
@@ -27,6 +27,13 @@ namespace Agama.Perun
             _factoryMethod = factoryMethod;
             _scope = scope;
         }
+
+        /// <summary>
+        /// Name of this plugin-info. 
+        /// Using names to resolve service it is bad pattern!!. 
+        /// You should use Func, which depends on circumstances.
+        /// </summary>
+        public string Name { get; set; }
 
         public IPerunScope Scope
         {
@@ -47,14 +54,14 @@ namespace Agama.Perun
             }
         }
 
-        public event EventHandler<GettingScopedInstanceEventArgs> AfterGotScoped;
-        private void OnAfterGetScopedInstance(GettingScopedInstanceEventArgs args)
+        public event EventHandler<GettingScopedInstanceEventArgs<object>> AfterGotScoped;
+        private void OnAfterGetScopedInstance(GettingScopedInstanceEventArgs<object> args)
         {
             if (AfterGotScoped != null)
                 AfterGotScoped(this, args);
         }
-        public event EventHandler<AfterBuiltComponentEventArgs> AfterBuiltNewComponent;
-        private void OnAfterBuiltNewComponent(AfterBuiltComponentEventArgs args)
+        public event EventHandler<AfterBuiltComponentEventArgs<object>> AfterBuiltNewComponent;
+        private void OnAfterBuiltNewComponent(AfterBuiltComponentEventArgs<object> args)
         {
             if (AfterBuiltNewComponent != null)
                 AfterBuiltNewComponent(this, args);

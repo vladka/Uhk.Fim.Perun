@@ -43,6 +43,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AfterBuiltComponentEventArgs.cs" />
+    <Compile Include="AfterMissedComponentEventArgs.cs" />
     <Compile Include="BuildingContext.cs" />
     <Compile Include="GettingScopedInstanceEventArgs.cs" />
     <Compile Include="HttpContextScope.cs" />
@@ -50,7 +51,7 @@
     <Compile Include="ImplementationBuilder.cs" />
     <Compile Include="InnerTypeDependencyScope.cs" />
     <Compile Include="IPerunScope.cs" />
-    <Compile Include="IResolver.cs" />
+    <Compile Include="IConfiguredPluginInfo.cs" />
     <Compile Include="OpenedImplementationBuilder.cs" />
     <Compile Include="PerunContainer.cs" />
     <Compile Include="PerunContainerConfiguration.cs" />

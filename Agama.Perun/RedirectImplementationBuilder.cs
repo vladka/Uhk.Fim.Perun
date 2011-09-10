@@ -5,7 +5,7 @@ namespace Agama.Perun
     /// <summary>
     /// Pouze presmerovaci implementace, ktera deleguje volani na otevrenou definici
     /// </summary>
-    public sealed class RedirectImplementationBuilder : IImplementationBuilder
+    public sealed class RedirectImplementationBuilder : IImplementationBuilder<object>
     {
         private readonly Type _pluginType;
         public readonly OpenedImplementationBuilder Target;
@@ -16,18 +16,27 @@ namespace Agama.Perun
             Target = target;
         }
 
-        public event EventHandler<GettingScopedInstanceEventArgs> AfterGotScoped;
-        private void OnAfterGetScopedInstance(GettingScopedInstanceEventArgs args)
+        /// <summary>
+        /// Name of this plugin-info. 
+        /// Using names to resolve service it is bad pattern!!. 
+        /// You should use Func, which depends on circumstances.
+        /// </summary>
+        public string Name { get; set; }
+
+        public event EventHandler<GettingScopedInstanceEventArgs<object>> AfterGotScoped;
+        private void OnAfterGetScopedInstance(GettingScopedInstanceEventArgs<object>args)
         {
             if (AfterGotScoped != null)
                 AfterGotScoped(this, args);
         }
-        public event EventHandler<AfterBuiltComponentEventArgs> AfterBuiltNewComponent;
-        private void OnAfterBuiltNewComponent(AfterBuiltComponentEventArgs args)
+        public event EventHandler<AfterBuiltComponentEventArgs<object>> AfterBuiltNewComponent;
+        private void OnAfterBuiltNewComponent(AfterBuiltComponentEventArgs<object> args)
         {
             if (AfterBuiltNewComponent != null)
                 AfterBuiltNewComponent(this, args);
         }
+
+
 
         public object Get(BuildingContext ctx)
         {

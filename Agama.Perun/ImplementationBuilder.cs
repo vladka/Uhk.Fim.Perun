@@ -5,7 +5,7 @@ namespace Agama.Perun
     /// <summary>
     /// Generic builder used for resolving fully specified componenets (not for opened generic types)
     /// </summary>
-    public class ImplementationBuilder<TPluginType> : IImplementationBuilder
+    public class ImplementationBuilder<TPluginType> : IImplementationBuilder<object>
     {
 
         
@@ -25,14 +25,21 @@ namespace Agama.Perun
 
         }
 
-        public event EventHandler<GettingScopedInstanceEventArgs> AfterGotScoped;
-        private void OnAfterGetScopedInstance(GettingScopedInstanceEventArgs args)
+        /// <summary>
+        /// Name of this plugin-info. 
+        /// Using names to resolve service it is bad pattern!!. 
+        /// You should use Func, which depends on circumstances.
+        /// </summary>
+        public string Name { get; set; }
+
+        public event EventHandler<GettingScopedInstanceEventArgs<object>> AfterGotScoped;
+        private void OnAfterGetScopedInstance(GettingScopedInstanceEventArgs<object> args)
         {
             if (AfterGotScoped != null)
                 AfterGotScoped(this, args);
         }
-        public event EventHandler<AfterBuiltComponentEventArgs> AfterBuiltNewComponent;
-        private void OnAfterBuiltNewComponent(AfterBuiltComponentEventArgs args)
+        public event EventHandler<AfterBuiltComponentEventArgs<object>> AfterBuiltNewComponent;
+        private void OnAfterBuiltNewComponent(AfterBuiltComponentEventArgs<object> args)
         {
             if (AfterBuiltNewComponent != null)
                 AfterBuiltNewComponent(this, args);
@@ -70,7 +77,7 @@ namespace Agama.Perun
             if (scopeObj == null)
             {
                 //scope cache is not needed
-                var args = new AfterBuiltComponentEventArgs(_factoryMethod(ctx));
+                var args = new AfterBuiltComponentEventArgs<object>(_factoryMethod(ctx));
                 OnAfterBuiltNewComponent(args);
                 return (TPluginType) args.Component;
             }
@@ -78,18 +85,18 @@ namespace Agama.Perun
             var result = (TPluginType)_scopedValues.FindValueByScope(scopeObj);
             if (!Object.Equals(result, default(TPluginType))) //if not null
             {
-                var args2 = new GettingScopedInstanceEventArgs(result);
+                var args2 = new GettingScopedInstanceEventArgs<object>(result);
                 OnAfterGetScopedInstance(args2);
                 return (TPluginType) args2.Component;
             }
 
             result = _factoryMethod(ctx);
-            var args3 = new AfterBuiltComponentEventArgs(result);
+            var args3 = new AfterBuiltComponentEventArgs<object>(result);
             OnAfterBuiltNewComponent(args3);
             _scopedValues.RegisterScopedObject(scopeObj, args3.Component);
             return (TPluginType) args3.Component;
         }
-        object IImplementationBuilder.Get(BuildingContext ctx)
+        object IImplementationBuilder<object>.Get(BuildingContext ctx)
         {
             return Get(ctx);
         }
@@ -146,7 +153,7 @@ namespace Agama.Perun
     /// <summary>
     /// Builder used for resolving fully specified componenets (not for opened generic types)
     /// </summary>
-    public class ImplementationBuilder : IImplementationBuilder
+    public class ImplementationBuilder : IImplementationBuilder<object>
     {
         private readonly PerunContainer _container;
         public readonly OpenedImplementationBuilder Creator;
@@ -172,14 +179,21 @@ namespace Agama.Perun
 
         }
 
-        public event EventHandler<GettingScopedInstanceEventArgs> AfterGotScoped;
-        private void OnAfterGetScopedInstance(GettingScopedInstanceEventArgs args)
+        /// <summary>
+        /// Name of this plugin-info. 
+        /// Using names to resolve service it is bad pattern!!. 
+        /// You should use Func, which depends on circumstances.
+        /// </summary>
+        public string Name { get; set; }
+
+        public event EventHandler<GettingScopedInstanceEventArgs<object>> AfterGotScoped;
+        private void OnAfterGetScopedInstance(GettingScopedInstanceEventArgs<object> args)
         {
             if (AfterGotScoped != null)
                 AfterGotScoped(this, args);
         }
-        public event EventHandler<AfterBuiltComponentEventArgs> AfterBuiltNewComponent;
-        private void OnAfterBuiltNewComponent(AfterBuiltComponentEventArgs args)
+        public event EventHandler<AfterBuiltComponentEventArgs<object>> AfterBuiltNewComponent;
+        private void OnAfterBuiltNewComponent(AfterBuiltComponentEventArgs<object> args)
         {
             if (AfterBuiltNewComponent != null)
                 AfterBuiltNewComponent(this, args);
@@ -235,7 +249,7 @@ namespace Agama.Perun
             var scopeObj = _scope.Context;
             if (scopeObj == null)
             {   //scope cache is not needed
-                var args = new AfterBuiltComponentEventArgs(_factoryMethod(ctx));
+                var args = new AfterBuiltComponentEventArgs<object>(_factoryMethod(ctx));
                 OnAfterBuiltNewComponent(args);
                 return args.Component;
             }
@@ -245,14 +259,14 @@ namespace Agama.Perun
             var result = _scopedValues.FindValueByScope(scopeObj);
             if (result != null)
             {
-                var args2 = new GettingScopedInstanceEventArgs(result);
+                var args2 = new GettingScopedInstanceEventArgs<object>(result);
                 OnAfterGetScopedInstance(args2);
                 return args2.Component;
             }
 
             //component is not found in scope cache.
             result = _factoryMethod(ctx);
-            var args3 = new AfterBuiltComponentEventArgs(result);
+            var args3 = new AfterBuiltComponentEventArgs<object>(result);
             OnAfterBuiltNewComponent(args3);
             _scopedValues.RegisterScopedObject(scopeObj, args3.Component);
             return args3.Component;
