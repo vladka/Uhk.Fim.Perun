@@ -1,4 +1,5 @@
-﻿using Agama.Perun;
+﻿using System.Collections.Generic;
+using Agama.Perun;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 
@@ -75,11 +76,11 @@ namespace Agama.Perun.Tests
             bool created = false;
             using (var ioc = new PerunContainer())
              {
-                 var regInfo = ioc.RegisterType<ITestDisposable, TestDisposableClass>(ioc);
+                 var regInfo = ioc.RegisterType<ITestDisposable, MockDisposableClass>(ioc);
                  regInfo.AfterBuiltNewComponent += (sender, args) =>
                                                        {
                                                            created = true;
-                                                           ((TestDisposableClass) args.Component).BeforeDisposeAction =
+                                                           ((MockDisposableClass) args.Component).BeforeDisposeAction =
                                                                () => disposed = true;
                                                        };
                  var myComponent = ioc.GetService<ITestDisposable>();
@@ -92,7 +93,7 @@ namespace Agama.Perun.Tests
         }
 
         /// <summary>
-        ///A test for Dispose
+        ///A test for AfterMissedComponent event, and GetService
         ///</summary>
         [TestMethod()]
         public void Test002()
@@ -103,7 +104,7 @@ namespace Agama.Perun.Tests
                 ioc.AfterMissedComponent += (sender, args) =>
                                                 {
                                                     if (args.RequieredComponentType == typeof(ITestDisposable))
-                                                        ioc.RegisterType<ITestDisposable, TestDisposableClass>();
+                                                        ioc.RegisterType<ITestDisposable, MockDisposableClass>();
                                                             
                                                 };
                 
@@ -112,7 +113,51 @@ namespace Agama.Perun.Tests
 
             }
         }
-       
+
+        /// <summary>
+        ///A test for AfterMissedComponent event, and GetService
+        ///</summary>
+        [TestMethod()]
+        public void Test003()
+        {
+            bool released = false;
+            using (var ioc = new PerunContainer())
+            {
+                
+                ioc.RegisterType<ITestDisposable, MockDisposableClass>(ioc/*=singleton*/)
+                    .BeforeReleaseComponent+=(sender,args)=>
+                                                 {
+                                                     released = true;
+                                                     args.RunDispose = true;//but this behavior is default
+                                                 };
+
+                var myComponent = ioc.GetService<ITestDisposable>();
+            }
+            Assert.IsTrue(released);
+        }
+
+        private class MockCircular
+        {
+            public MockCircular(MockCircular p)
+            {
+                
+            }
+        }
+
+
+        [TestMethod()]
+        public void CircularDependecyTest()
+        {
+            using (var ioc = new PerunContainer())
+            {
+                //subtest1
+                ioc.RegisterType<object>(ioc.GetService<object>);
+                
+                //subtest2
+                ioc.RegisterType<MockCircular>();
+                var myComponent = ioc.GetService<MockCircular>();
+            }
+        }
 
 
         /// <summary>
@@ -136,7 +181,7 @@ namespace Agama.Perun.Tests
             using (var ioc = new PerunContainer())
             {
 
-                ioc.RegisterType<ITestDisposable, TestDisposableClass>(ioc); //as singleton /* PerunConatiner implements IPersunScope*/
+                ioc.RegisterType<ITestDisposable, MockDisposableClass>(ioc); //as singleton /* PerunConatiner implements IPersunScope*/
                 var a = ioc.GetService<ITestDisposable>();
                 a.BeforeDisposeAction = () => disposed = true;
 

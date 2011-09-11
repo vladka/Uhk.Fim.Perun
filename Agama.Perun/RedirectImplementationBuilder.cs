@@ -36,7 +36,18 @@ namespace Agama.Perun
                 AfterBuiltNewComponent(this, args);
         }
 
+        public event EventHandler<BeforeReleaseComponentEventArgs<object>> BeforeReleaseComponent;
+        private void OnBeforeReleaseComponent(BeforeReleaseComponentEventArgs<object> args)
+        {
+            if (BeforeReleaseComponent != null)
+                BeforeReleaseComponent(this, args);
+        }
 
+        public void ReleaseComponent(object instanceToRelease)
+        {
+            //nemas smysl pro tento typ
+
+        }
 
         public object Get(BuildingContext ctx)
         {

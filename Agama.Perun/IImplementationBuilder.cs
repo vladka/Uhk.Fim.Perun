@@ -6,6 +6,7 @@ namespace Agama.Perun
     {
 
         object Get(BuildingContext ctx);
+        void ReleaseComponent(object instanceToRelease);
        
         
     }

@@ -25,7 +25,7 @@ namespace Agama.Perun
 
         private void AsyncCleanup()
         {
-            Console.WriteLine("Cleaning...");
+            
             while (!_disposed)
             {
                 Thread.Sleep(1000);

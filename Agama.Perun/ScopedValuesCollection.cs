@@ -12,10 +12,15 @@ namespace Agama.Perun
         private readonly Dictionary<WeakReference,object> _all = new Dictionary<WeakReference, object>();
 
         private readonly ScoppingRegistration _scoppingRegistration;
+        private IImplementationBuilder<object> _owner;
 
-        public ScopedValuesCollection(ScoppingRegistration scoppingRegistration)
+        
+
+        internal ScopedValuesCollection(ScoppingRegistration scoppingRegistration, IImplementationBuilder<object> implementationBuilder)
         {
-            _scoppingRegistration = scoppingRegistration;
+            // TODO: Complete member initialization
+            this._scoppingRegistration = scoppingRegistration;
+            this._owner = implementationBuilder;
         }
 
         /// <summary>
@@ -56,10 +61,8 @@ namespace Agama.Perun
             if (_all.TryGetValue(key, out  value))
             {
                 _all.Remove(key);
-                var disposable = value as IDisposable;
-                if (disposable!=null)
-                    disposable.Dispose();
-
+                _owner.ReleaseComponent(value);
+                
             }
         }
 

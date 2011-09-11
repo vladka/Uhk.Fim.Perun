@@ -20,7 +20,7 @@ namespace Agama.Perun
             _container = container;
             _factoryMethod = factoryMethod;
             _scope = scope;
-            _scopedValues = new ScopedValuesCollection(_container._scoppings);
+            _scopedValues = new ScopedValuesCollection(_container._scoppings,this);
             _pluginType = typeof (TPluginType); //to be quick
 
         }
@@ -44,6 +44,27 @@ namespace Agama.Perun
             if (AfterBuiltNewComponent != null)
                 AfterBuiltNewComponent(this, args);
         }
+        public event EventHandler<BeforeReleaseComponentEventArgs<object>> BeforeReleaseComponent;
+        private void OnBeforeReleaseComponent(BeforeReleaseComponentEventArgs<object> args)
+        {
+            if (BeforeReleaseComponent != null)
+                BeforeReleaseComponent(this, args);
+        }
+
+        public void ReleaseComponent(object instanceToRelease)
+        {
+            var args = new BeforeReleaseComponentEventArgs<object>(instanceToRelease);
+            
+            OnBeforeReleaseComponent(args);
+
+            if (args.RunDispose)
+            {
+                var disposable = instanceToRelease as IDisposable;
+                if (disposable != null)
+                    disposable.Dispose();
+            }
+
+        }
 
         public IPerunScope Scope
         {
@@ -63,6 +84,8 @@ namespace Agama.Perun
                 return _pluginType;
             }
         }
+
+        
 
         public TPluginType Get(BuildingContext ctx)
         {
@@ -174,7 +197,7 @@ namespace Agama.Perun
             _factoryMethod = factoryMethod;
             _scope = scope;
             _creator = creator;
-            _scopedValues = new ScopedValuesCollection(_container._scoppings);
+            _scopedValues = new ScopedValuesCollection(_container._scoppings,this);
 
 
         }
@@ -198,7 +221,27 @@ namespace Agama.Perun
             if (AfterBuiltNewComponent != null)
                 AfterBuiltNewComponent(this, args);
         }
+        public event EventHandler<BeforeReleaseComponentEventArgs<object>> BeforeReleaseComponent;
+        private void OnBeforeReleaseComponent(BeforeReleaseComponentEventArgs<object> args)
+        {
+            if (BeforeReleaseComponent != null)
+                BeforeReleaseComponent(this, args);
+        }
 
+        public void ReleaseComponent(object instanceToRelease)
+        {
+            var args = new BeforeReleaseComponentEventArgs<object>(instanceToRelease);
+
+            OnBeforeReleaseComponent(args);
+
+            if (args.RunDispose)
+            {
+                var disposable = instanceToRelease as IDisposable;
+                if (disposable != null)
+                    disposable.Dispose();
+            }
+
+        }
         public IPerunScope Scope
         {
             get

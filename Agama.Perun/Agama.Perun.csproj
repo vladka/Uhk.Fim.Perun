@@ -44,7 +44,9 @@
   <ItemGroup>
     <Compile Include="AfterBuiltComponentEventArgs.cs" />
     <Compile Include="AfterMissedComponentEventArgs.cs" />
+    <Compile Include="BeforeReleaseComponentEventArgs.cs" />
     <Compile Include="BuildingContext.cs" />
+    <Compile Include="FuncScope.cs" />
     <Compile Include="GettingScopedInstanceEventArgs.cs" />
     <Compile Include="HttpContextScope.cs" />
     <Compile Include="IImplementationBuilder.cs" />

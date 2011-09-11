@@ -66,6 +66,18 @@ namespace Agama.Perun
             if (AfterBuiltNewComponent != null)
                 AfterBuiltNewComponent(this, args);
         }
+        public event EventHandler<BeforeReleaseComponentEventArgs<object>> BeforeReleaseComponent;
+        private void OnBeforeReleaseComponent(BeforeReleaseComponentEventArgs<object> args)
+        {
+            if (BeforeReleaseComponent != null)
+                BeforeReleaseComponent(this, args);
+        }
+
+        public void ReleaseComponent(object instanceToRelease)
+        {
+          //nemas smysl pro tento typ
+
+        }
         //tato metoda probiha pouze poprve pri prvni vyrobe konkretniho generickeho typu
         public object Get(BuildingContext ctx)
         {
