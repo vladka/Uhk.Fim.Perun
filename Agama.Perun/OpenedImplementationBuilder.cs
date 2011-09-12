@@ -9,7 +9,7 @@ namespace Agama.Perun
     ///  (<see cref="ImplementationBuilder"/> or <see cref="ImplementationBuilder{TPluginType}"/>).
     /// 
     /// </summary>
-    public sealed class OpenedImplementationBuilder : IImplementationBuilder<object >
+    public sealed class OpenedImplementationBuilder : IImplementationBuilder
     {
 
         private readonly ScoppingRegistration _scoppingRegistration;
@@ -54,20 +54,20 @@ namespace Agama.Perun
             }
         }
 
-        public event EventHandler<GettingScopedInstanceEventArgs<object>> AfterGotScoped;
-        private void OnAfterGetScopedInstance(GettingScopedInstanceEventArgs<object> args)
+        public event EventHandler<GettingScopedInstanceEventArgs> AfterGotScoped;
+        private void OnAfterGetScopedInstance(GettingScopedInstanceEventArgs args)
         {
             if (AfterGotScoped != null)
                 AfterGotScoped(this, args);
         }
-        public event EventHandler<AfterBuiltComponentEventArgs<object>> AfterBuiltNewComponent;
-        private void OnAfterBuiltNewComponent(AfterBuiltComponentEventArgs<object> args)
+        public event EventHandler<AfterBuiltComponentEventArgs> AfterBuiltNewComponent;
+        private void OnAfterBuiltNewComponent(AfterBuiltComponentEventArgs args)
         {
             if (AfterBuiltNewComponent != null)
                 AfterBuiltNewComponent(this, args);
         }
-        public event EventHandler<BeforeReleaseComponentEventArgs<object>> BeforeReleaseComponent;
-        private void OnBeforeReleaseComponent(BeforeReleaseComponentEventArgs<object> args)
+        public event EventHandler<BeforeReleaseComponentEventArgs> BeforeReleaseComponent;
+        private void OnBeforeReleaseComponent(BeforeReleaseComponentEventArgs args)
         {
             if (BeforeReleaseComponent != null)
                 BeforeReleaseComponent(this, args);

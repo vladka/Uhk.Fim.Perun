@@ -12,11 +12,11 @@ namespace Agama.Perun
         private readonly Dictionary<WeakReference,object> _all = new Dictionary<WeakReference, object>();
 
         private readonly ScoppingRegistration _scoppingRegistration;
-        private IImplementationBuilder<object> _owner;
+        private IImplementationBuilder _owner;
 
         
 
-        internal ScopedValuesCollection(ScoppingRegistration scoppingRegistration, IImplementationBuilder<object> implementationBuilder)
+        internal ScopedValuesCollection(ScoppingRegistration scoppingRegistration, IImplementationBuilder implementationBuilder)
         {
             // TODO: Complete member initialization
             this._scoppingRegistration = scoppingRegistration;

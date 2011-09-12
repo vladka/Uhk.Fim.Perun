@@ -2,12 +2,21 @@
 
 namespace Agama.Perun
 {
-    internal interface  IImplementationBuilder< T>:IConfiguredPluginInfo<T>
+    internal interface  IImplementationBuilder:IConfiguredPluginInfo
     {
 
         object Get(BuildingContext ctx);
         void ReleaseComponent(object instanceToRelease);
        
         
+    }
+
+    internal interface IImplementationBuilder<T> : IImplementationBuilder,IConfiguredPluginInfo<T>
+    {
+
+       // object Get(BuildingContext ctx);
+       // void ReleaseComponent(object instanceToRelease);
+
+
     }
 }

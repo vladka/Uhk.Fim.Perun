@@ -5,7 +5,7 @@ namespace Agama.Perun
     /// <summary>
     /// Pouze presmerovaci implementace, ktera deleguje volani na otevrenou definici
     /// </summary>
-    public sealed class RedirectImplementationBuilder : IImplementationBuilder<object>
+    public sealed class RedirectImplementationBuilder : IImplementationBuilder
     {
         private readonly Type _pluginType;
         public readonly OpenedImplementationBuilder Target;
@@ -23,21 +23,21 @@ namespace Agama.Perun
         /// </summary>
         public string Name { get; set; }
 
-        public event EventHandler<GettingScopedInstanceEventArgs<object>> AfterGotScoped;
-        private void OnAfterGetScopedInstance(GettingScopedInstanceEventArgs<object>args)
+        public event EventHandler<GettingScopedInstanceEventArgs> AfterGotScoped;
+        private void OnAfterGetScopedInstance(GettingScopedInstanceEventArgs args)
         {
             if (AfterGotScoped != null)
                 AfterGotScoped(this, args);
         }
-        public event EventHandler<AfterBuiltComponentEventArgs<object>> AfterBuiltNewComponent;
-        private void OnAfterBuiltNewComponent(AfterBuiltComponentEventArgs<object> args)
+        public event EventHandler<AfterBuiltComponentEventArgs> AfterBuiltNewComponent;
+        private void OnAfterBuiltNewComponent(AfterBuiltComponentEventArgs args)
         {
             if (AfterBuiltNewComponent != null)
                 AfterBuiltNewComponent(this, args);
         }
 
-        public event EventHandler<BeforeReleaseComponentEventArgs<object>> BeforeReleaseComponent;
-        private void OnBeforeReleaseComponent(BeforeReleaseComponentEventArgs<object> args)
+        public event EventHandler<BeforeReleaseComponentEventArgs> BeforeReleaseComponent;
+        private void OnBeforeReleaseComponent(BeforeReleaseComponentEventArgs args)
         {
             if (BeforeReleaseComponent != null)
                 BeforeReleaseComponent(this, args);

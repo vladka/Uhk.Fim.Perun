@@ -46,7 +46,7 @@ namespace Agama.Perun
         
         protected override object UpdateContext()
         {
-            List<IImplementationBuilder<object>> innerImpls;
+            List<IImplementationBuilder> innerImpls;
 
             var type = BindingContext.ResolvingType.GetGenericArguments()[0];
             if (!BindingContext.Container._all.TryGetValue(type, out innerImpls))

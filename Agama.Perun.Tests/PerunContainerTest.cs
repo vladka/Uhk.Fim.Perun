@@ -76,11 +76,12 @@ namespace Agama.Perun.Tests
             bool created = false;
             using (var ioc = new PerunContainer())
              {
-                 var regInfo = ioc.RegisterType<ITestDisposable, MockDisposableClass>(ioc);
-                 regInfo.AfterBuiltNewComponent += (sender, args) =>
+                 IConfiguredPluginInfo<ITestDisposable> regInfo = ioc.RegisterType<ITestDisposable, MockDisposableClass>(ioc);
+                 regInfo.AfterBuiltNewComponent+= (sender, args) =>
                                                        {
+                                                          
                                                            created = true;
-                                                           ((MockDisposableClass) args.Component).BeforeDisposeAction =
+                                                           (args.Component).BeforeDisposeAction =
                                                                () => disposed = true;
                                                        };
                  var myComponent = ioc.GetService<ITestDisposable>();
@@ -128,6 +129,7 @@ namespace Agama.Perun.Tests
                     .BeforeReleaseComponent+=(sender,args)=>
                                                  {
                                                      released = true;
+                                                     
                                                      args.RunDispose = true;//but this behavior is default
                                                  };
 

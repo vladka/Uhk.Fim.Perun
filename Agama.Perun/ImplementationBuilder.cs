@@ -2,10 +2,15 @@
 
 namespace Agama.Perun
 {
+    //public delegate void EventHandler<out TEventArgs>(object sender, GettingScopedInstanceEventArgs e) where TEventArgs : EventArgs;
+    //public delegate void EventHandler<out TEventArgs>(object sender, TEventArgs e) where TEventArgs : EventArgs;
+    //public delegate void EventHandler<out TEventArgs>(object sender, BeforeReleaseComponentEventArgs e) where TEventArgs : EventArgs;
+
+    
     /// <summary>
     /// Generic builder used for resolving fully specified componenets (not for opened generic types)
     /// </summary>
-    public class ImplementationBuilder<TPluginType> : IImplementationBuilder<object>
+    public class ImplementationBuilder<TPluginType> : IImplementationBuilder<TPluginType>
     {
 
         
@@ -32,28 +37,83 @@ namespace Agama.Perun
         /// </summary>
         public string Name { get; set; }
 
-        public event EventHandler<GettingScopedInstanceEventArgs<object>> AfterGotScoped;
-        private void OnAfterGetScopedInstance(GettingScopedInstanceEventArgs<object> args)
-        {
-            if (AfterGotScoped != null)
-                AfterGotScoped(this, args);
-        }
-        public event EventHandler<AfterBuiltComponentEventArgs<object>> AfterBuiltNewComponent;
-        private void OnAfterBuiltNewComponent(AfterBuiltComponentEventArgs<object> args)
-        {
-            if (AfterBuiltNewComponent != null)
-                AfterBuiltNewComponent(this, args);
-        }
-        public event EventHandler<BeforeReleaseComponentEventArgs<object>> BeforeReleaseComponent;
-        private void OnBeforeReleaseComponent(BeforeReleaseComponentEventArgs<object> args)
-        {
-            if (BeforeReleaseComponent != null)
-                BeforeReleaseComponent(this, args);
-        }
+        #region Event declaration...
 
+        readonly object objectLock = new Object();
+        private event EventHandler<GettingScopedInstanceEventArgs> _afterGotScoped;
+        
+        event EventHandler<GettingScopedInstanceEventArgs> IConfiguredPluginInfo.AfterGotScoped
+        {
+            add { lock(objectLock) {_afterGotScoped += value;}}
+            remove{lock (objectLock){_afterGotScoped -= value;}}
+        }
+        
+        private event EventHandler<GettingScopedInstanceEventArgs<TPluginType>> _afterGotScoped2; //todo:rename
+        public event EventHandler<GettingScopedInstanceEventArgs<TPluginType>> AfterGotScoped
+        {
+            add { lock(objectLock) {_afterGotScoped2 +=  value;}}
+            remove{lock (objectLock){_afterGotScoped2 -= value;}}
+        }
+        
+        
+        private void OnAfterGetScopedInstance(GettingScopedInstanceEventArgs<TPluginType> args)
+        {
+            if (_afterGotScoped != null)
+                _afterGotScoped(this, args);
+            if (_afterGotScoped2 != null)
+                _afterGotScoped2(this, args);
+        }
+        
+        //------
+        readonly object objectLock2 = new Object();
+        private event EventHandler<AfterBuiltComponentEventArgs> _afterBuiltNewComponent;
+        event EventHandler<AfterBuiltComponentEventArgs> IConfiguredPluginInfo.AfterBuiltNewComponent
+        {
+            add { lock(objectLock2) {_afterBuiltNewComponent += value;}}
+            remove{lock (objectLock2){_afterBuiltNewComponent -= value;}}
+        }
+        private event EventHandler<AfterBuiltComponentEventArgs<TPluginType>> _afterBuiltNewComponent2;
+        public event EventHandler<AfterBuiltComponentEventArgs<TPluginType>> AfterBuiltNewComponent
+         {
+             add { lock (objectLock2) { _afterBuiltNewComponent2 +=  value; } }
+            remove{lock (objectLock2){_afterBuiltNewComponent2 -= value;}}
+        }
+        private void OnAfterBuiltNewComponent(AfterBuiltComponentEventArgs<TPluginType> args)
+        {
+            if (_afterBuiltNewComponent != null)
+                _afterBuiltNewComponent(this, args);
+            if (_afterBuiltNewComponent2 != null)
+                _afterBuiltNewComponent2(this, args);
+        }
+        
+        //--------
+        readonly object objectLock3 = new Object();
+        private event EventHandler<BeforeReleaseComponentEventArgs> _beforeReleaseComponent;
+        
+        event EventHandler<BeforeReleaseComponentEventArgs> IConfiguredPluginInfo.BeforeReleaseComponent
+         {
+            add { lock(objectLock3) {_beforeReleaseComponent += value;}}
+            remove{lock (objectLock3){_beforeReleaseComponent -= value;}}
+        }
+        private event EventHandler<BeforeReleaseComponentEventArgs<TPluginType>> _beforeReleaseComponent2;
+        public event EventHandler<BeforeReleaseComponentEventArgs<TPluginType>> BeforeReleaseComponent
+         {
+            add { lock(objectLock3) {_beforeReleaseComponent2 += value;}}
+            remove{lock (objectLock3){_beforeReleaseComponent2 -= value;}}
+        }
+        
+        private void OnBeforeReleaseComponent(BeforeReleaseComponentEventArgs<TPluginType> args)
+        {
+            if (_beforeReleaseComponent != null)
+                _beforeReleaseComponent(this, args);
+            if (_beforeReleaseComponent2 != null)
+                _beforeReleaseComponent2(this, args);
+        }
+        #endregion
+        //------------
         public void ReleaseComponent(object instanceToRelease)
         {
-            var args = new BeforeReleaseComponentEventArgs<object>(instanceToRelease);
+            var args = new BeforeReleaseComponentEventArgs<TPluginType>((TPluginType)instanceToRelease);
             
             OnBeforeReleaseComponent(args);
 
@@ -100,7 +160,7 @@ namespace Agama.Perun
             if (scopeObj == null)
             {
                 //scope cache is not needed
-                var args = new AfterBuiltComponentEventArgs<object>(_factoryMethod(ctx));
+                var args = new AfterBuiltComponentEventArgs<TPluginType>(_factoryMethod(ctx));
                 OnAfterBuiltNewComponent(args);
                 return (TPluginType) args.Component;
             }
@@ -108,18 +168,18 @@ namespace Agama.Perun
             var result = (TPluginType)_scopedValues.FindValueByScope(scopeObj);
             if (!Object.Equals(result, default(TPluginType))) //if not null
             {
-                var args2 = new GettingScopedInstanceEventArgs<object>(result);
+                var args2 = new GettingScopedInstanceEventArgs<TPluginType>(result);
                 OnAfterGetScopedInstance(args2);
                 return (TPluginType) args2.Component;
             }
 
             result = _factoryMethod(ctx);
-            var args3 = new AfterBuiltComponentEventArgs<object>(result);
+            var args3 = new AfterBuiltComponentEventArgs<TPluginType>(result);
             OnAfterBuiltNewComponent(args3);
             _scopedValues.RegisterScopedObject(scopeObj, args3.Component);
             return (TPluginType) args3.Component;
         }
-        object IImplementationBuilder<object>.Get(BuildingContext ctx)
+        object IImplementationBuilder.Get(BuildingContext ctx)
         {
             return Get(ctx);
         }
@@ -157,8 +217,13 @@ namespace Agama.Perun
             Disposed = true;
             _scopedValues.Dispose();
             _container.UnRegister(this);
-            AfterBuiltNewComponent = null;
-            AfterGotScoped = null;
+            
+            _afterBuiltNewComponent = null;
+            _afterBuiltNewComponent2 = null;
+            _afterGotScoped = null;
+            _afterGotScoped2 = null;
+            _beforeReleaseComponent = null;
+            _beforeReleaseComponent2 = null;
             
         }
 
@@ -176,7 +241,7 @@ namespace Agama.Perun
     /// <summary>
     /// Builder used for resolving fully specified componenets (not for opened generic types)
     /// </summary>
-    public class ImplementationBuilder : IImplementationBuilder<object>
+    public class ImplementationBuilder : IImplementationBuilder
     {
         private readonly PerunContainer _container;
         public readonly OpenedImplementationBuilder Creator;
@@ -209,20 +274,20 @@ namespace Agama.Perun
         /// </summary>
         public string Name { get; set; }
 
-        public event EventHandler<GettingScopedInstanceEventArgs<object>> AfterGotScoped;
-        private void OnAfterGetScopedInstance(GettingScopedInstanceEventArgs<object> args)
+        public event EventHandler<GettingScopedInstanceEventArgs> AfterGotScoped;
+        private void OnAfterGetScopedInstance(GettingScopedInstanceEventArgs args)
         {
             if (AfterGotScoped != null)
                 AfterGotScoped(this, args);
         }
-        public event EventHandler<AfterBuiltComponentEventArgs<object>> AfterBuiltNewComponent;
-        private void OnAfterBuiltNewComponent(AfterBuiltComponentEventArgs<object> args)
+        public event EventHandler<AfterBuiltComponentEventArgs> AfterBuiltNewComponent;
+        private void OnAfterBuiltNewComponent(AfterBuiltComponentEventArgs args)
         {
             if (AfterBuiltNewComponent != null)
                 AfterBuiltNewComponent(this, args);
         }
-        public event EventHandler<BeforeReleaseComponentEventArgs<object>> BeforeReleaseComponent;
-        private void OnBeforeReleaseComponent(BeforeReleaseComponentEventArgs<object> args)
+        public event EventHandler<BeforeReleaseComponentEventArgs> BeforeReleaseComponent;
+        private void OnBeforeReleaseComponent(BeforeReleaseComponentEventArgs args)
         {
             if (BeforeReleaseComponent != null)
                 BeforeReleaseComponent(this, args);
@@ -230,7 +295,7 @@ namespace Agama.Perun
 
         public void ReleaseComponent(object instanceToRelease)
         {
-            var args = new BeforeReleaseComponentEventArgs<object>(instanceToRelease);
+            var args = new BeforeReleaseComponentEventArgs(instanceToRelease);
 
             OnBeforeReleaseComponent(args);
 
@@ -292,7 +357,7 @@ namespace Agama.Perun
             var scopeObj = _scope.Context;
             if (scopeObj == null)
             {   //scope cache is not needed
-                var args = new AfterBuiltComponentEventArgs<object>(_factoryMethod(ctx));
+                var args = new AfterBuiltComponentEventArgs(_factoryMethod(ctx));
                 OnAfterBuiltNewComponent(args);
                 return args.Component;
             }
@@ -302,14 +367,14 @@ namespace Agama.Perun
             var result = _scopedValues.FindValueByScope(scopeObj);
             if (result != null)
             {
-                var args2 = new GettingScopedInstanceEventArgs<object>(result);
+                var args2 = new GettingScopedInstanceEventArgs(result);
                 OnAfterGetScopedInstance(args2);
                 return args2.Component;
             }
 
             //component is not found in scope cache.
             result = _factoryMethod(ctx);
-            var args3 = new AfterBuiltComponentEventArgs<object>(result);
+            var args3 = new AfterBuiltComponentEventArgs(result);
             OnAfterBuiltNewComponent(args3);
             _scopedValues.RegisterScopedObject(scopeObj, args3.Component);
             return args3.Component;
