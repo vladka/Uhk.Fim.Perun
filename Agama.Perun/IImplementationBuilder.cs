@@ -19,4 +19,12 @@ namespace Agama.Perun
 
 
     }
+    //internal interface IImplementationBuilder<TPlugin,TReal> : IImplementationBuilder<TPlugin>, IConfiguredPluginInfo<TPlugin,TReal>
+    //{
+
+    //    // object Get(BuildingContext ctx);
+    //    // void ReleaseComponent(object instanceToRelease);
+
+
+    //}
 }

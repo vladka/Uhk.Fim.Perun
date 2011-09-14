@@ -1,7 +1,9 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Threading;
 
 namespace Agama.Perun
 {
@@ -10,11 +12,14 @@ namespace Agama.Perun
     /// </summary>
     public partial class PerunContainer :  IPerunScope, IDisposable
     {
-        
-        internal readonly Dictionary<Type,List<IImplementationBuilder>> _all = new Dictionary<Type, List<IImplementationBuilder>>();
+
+        internal readonly ConcurrentDictionary<Type, List<IImplementationBuilder>> _all = new ConcurrentDictionary<Type, List<IImplementationBuilder>>();
         internal ScoppingRegistration _scoppings = new ScoppingRegistration();
         private readonly Dictionary<Type, Type> _cache= new Dictionary<Type, Type>();
-
+        /// <summary>
+        /// Version of data, every registration or remove increments this number
+        /// </summary>
+        private long _serial = 0;
         
         /// <summary>
         /// Creates new DI container. If <paramref name="configurationManager"/> is not specified, the default one is used.
@@ -25,6 +30,8 @@ namespace Agama.Perun
             ConfigurationManager = configurationManager ?? new PerunContainerConfigurationManager(this);
             
             ConfigurationManager.Configure();
+
+            _serial = 0; //we set it to zero after configurationManager running.
         }
 
         /// <summary>
@@ -42,7 +49,17 @@ namespace Agama.Perun
         /// </summary>
         public event EventHandler<AfterMissedComponentEventArgs> AfterMissedComponent;
 
-
+        /// <summary>
+        /// Version of data, every registration or remove components increments this number.
+        /// If this number is changed, something has been changed.
+        /// </summary>
+        public long Serial
+        {
+            get
+            {
+                return _serial;
+            }
+        }
        
 
         #region 'Query' methods
@@ -100,12 +117,12 @@ namespace Agama.Perun
         /// Enumerates service determined by their predicate
         /// </summary>
         /// <returns></returns>
-        public IEnumerable<object> GetServices(Predicate<ImplementationBuilder> match)
+        public IEnumerable<object> GetServices(Predicate<IConfiguredPluginInfo> match)
         {
 
-            foreach (var listOfBuilders in _all.Values)
+            foreach (var listOfBuilders in _all)
             {
-                foreach (var implementationBuilder in listOfBuilders)
+                foreach (var implementationBuilder in listOfBuilders.Value)
                 {
                     if (implementationBuilder is RedirectImplementationBuilder) continue;
                     if (implementationBuilder is OpenedImplementationBuilder) continue;
@@ -250,35 +267,81 @@ namespace Agama.Perun
 
         #region RegisterType Methods..
 
-        public IConfiguredPluginInfo RegisterType<TReal>(IPerunScope scope = null)
+        public IConfiguredPluginInfo<TReal> RegisterType<TReal>(IPerunScope scope = null)
         {
-            return RegisterType<TReal>(CreateFunc<TReal, TReal>(), scope ?? TransientScope.Instance);
+            return (IConfiguredPluginInfo<TReal>) RegisterType<TReal>(CreateFunc<TReal>(), scope ?? TransientScope.Instance);
         }
-
         public IConfiguredPluginInfo<TInterface> RegisterType<TInterface, TReal>(IPerunScope scope = null) where TReal : TInterface
         {
-            return (IConfiguredPluginInfo<TInterface>) RegisterType<TInterface>(CreateFunc<TInterface, TReal>(), scope ?? TransientScope.Instance);
+            var inner = CreateFunc<TReal,TInterface>();
+            
+            return RegisterType<TInterface>(inner, scope ?? TransientScope.Instance);
         }
 
-        public IConfiguredPluginInfo RegisterType<TInterface>(Func<TInterface> builder, IPerunScope scope = null)
+        /// <summary>
+        /// Experimental.
+        /// </summary>
+        /// <typeparam name="TInterface"></typeparam>
+        /// <typeparam name="TReal"></typeparam>
+        /// <param name="scope"></param>
+        /// <returns></returns>
+        public IConfiguredPluginInfo<TReal> ____RegisterTypeConcrete<TInterface, TReal>(IPerunScope scope = null) where TReal : TInterface
+        {
+            var inner = CreateFunc<TReal>();
+            Func<BuildingContext, TReal> outer = ctx => inner();
+            return RegisterType<TInterface,TReal>(outer, scope ?? TransientScope.Instance);
+        }
+
+        public  IConfiguredPluginInfo<TInterface> RegisterType<TInterface>(Func<TInterface> builder, IPerunScope scope = null)
        {
-           return RegisterType<TInterface>(CreateFunc(builder),scope ?? TransientScope.Instance);
+           return  RegisterType<TInterface>(CreateFunc(builder), scope ?? TransientScope.Instance);
            
        }
 
        
 
-        public IConfiguredPluginInfo RegisterType<TInterface>(Func<BuildingContext,TInterface> builder,IPerunScope scope = null)
+        public IConfiguredPluginInfo<TInterface> RegisterType<TInterface>(Func<BuildingContext,TInterface> builder,IPerunScope scope = null)
         {
             List<IImplementationBuilder> implementators;
             var interfaceType = typeof (TInterface);
-            if (!_all.TryGetValue(interfaceType, out implementators))
+            while (true)
             {
-                implementators = new List<IImplementationBuilder>();
-                _all.Add(interfaceType, implementators);
+                if (!_all.TryGetValue(interfaceType, out implementators))
+                {
+                    implementators = new List<IImplementationBuilder>();
+                    if (_all.TryAdd(interfaceType, implementators))
+                        continue; //else the cycle goes again
+
+                }
+                Interlocked.Increment(ref _serial);
+                break;
             }
 
             var impl = new ImplementationBuilder<TInterface>(this, builder,scope ?? TransientScope.Instance);
+            implementators.Add(impl);
+            return impl;
+        }
+
+      
+
+        public IConfiguredPluginInfo<TReal> RegisterType<TInterface,TReal>(Func<BuildingContext, TReal> builder, IPerunScope scope = null) where TReal : TInterface
+        {
+            List<IImplementationBuilder> implementators;
+            var interfaceType = typeof(TInterface);
+            while (true)
+            {
+                if (!_all.TryGetValue(interfaceType, out implementators))
+                {
+                    implementators = new List<IImplementationBuilder>();
+                    if (!_all.TryAdd(interfaceType, implementators))
+                         continue;; //else the cycle goes again
+
+                }
+                Interlocked.Increment(ref _serial);
+                break;
+            }
+
+            var impl = new ImplementationBuilder<TInterface,TReal>(this, builder, scope ?? TransientScope.Instance);
             implementators.Add(impl);
             return impl;
         }
@@ -382,7 +445,11 @@ namespace Agama.Perun
             implementators.Remove(toRemove);
 
             if (implementators.Count == 0)
-                this._all.Remove(builder.PluginType);
+            {
+                List<IImplementationBuilder> tmp;
+                if (this._all.TryRemove(builder.PluginType,out tmp ))
+                    Interlocked.Increment(ref _serial);
+            }
 
 
         }
@@ -392,42 +459,52 @@ namespace Agama.Perun
         internal IImplementationBuilder RegisterInternal(Type interfaceType, IImplementationBuilder builder, Tuple<OpenedImplementationBuilder, ImplementationBuilder> callerToReplace = null)
         {
             List<IImplementationBuilder> implementators;
-            if (!_all.TryGetValue(interfaceType, out implementators))
+            while (true)
             {
-                implementators = new List<IImplementationBuilder>();
-                _all.Add(interfaceType, implementators);
-
-
-                if (callerToReplace==null && interfaceType.IsGenericType && (!interfaceType.IsGenericTypeDefinition))
+                if (!_all.TryGetValue(interfaceType, out implementators))
                 {
-                    //pokud definujeme genericky typ, ale uz je definovan predpis pro otevreny genericky typ, 
-                    //tak tento otevreny musi zustat jako defaultni
-                    //Tuto vetev vsak nevolame, pokud jde o zakladani volane otevrene definice (callerToReplace==null)
-                    List<IImplementationBuilder> openedImplementators;
-                    if (_all.TryGetValue(interfaceType.GetGenericTypeDefinition(), out openedImplementators))
+                    implementators = new List<IImplementationBuilder>();
+                    if (!_all.TryAdd(interfaceType, implementators))
+                        continue; //try again, parallel access
+                    
+                    Interlocked.Increment(ref _serial);
+
+                    if (callerToReplace == null && interfaceType.IsGenericType &&
+                        (!interfaceType.IsGenericTypeDefinition))
                     {
-                        implementators.Add(
-                            new RedirectImplementationBuilder(interfaceType,(OpenedImplementationBuilder) openedImplementators[0]));
+                        //pokud definujeme genericky typ, ale uz je definovan predpis pro otevreny genericky typ, 
+                        //tak tento otevreny musi zustat jako defaultni
+                        //Tuto vetev vsak nevolame, pokud jde o zakladani volane otevrene definice (callerToReplace==null)
+                        List<IImplementationBuilder> openedImplementators;
+                        if (_all.TryGetValue(interfaceType.GetGenericTypeDefinition(), out openedImplementators))
+                        {
+                            implementators.Add(
+                                new RedirectImplementationBuilder(interfaceType,
+                                                                  (OpenedImplementationBuilder) openedImplementators[0]));
+                        }
                     }
                 }
-            }
-            else
-            {
-                //jakmile otevřená definice má svoji konkrétní implementaci, nahradíme puvodni 'redirector'
-                if (callerToReplace != null )
+                else
                 {
-                    int indexToReplace = implementators.FindIndex(x=>
-                                            {
-                                                var openedRedirector = x as RedirectImplementationBuilder;
-                                                return (openedRedirector != null &&
-                                                        openedRedirector.Target == callerToReplace.Item1);
-                                                    
-                                            }
-                                            );
-                    if (indexToReplace >= 0)
-                        implementators[indexToReplace] = callerToReplace.Item2;
-                    return null; //neni potreba nic vracet pokud callerToReplace!=null
+                    //jakmile otevřená definice má svoji konkrétní implementaci, nahradíme puvodni 'redirector'
+                    if (callerToReplace != null)
+                    {
+                        int indexToReplace = implementators.FindIndex(x =>
+                                                                          {
+                                                                              var openedRedirector =
+                                                                                  x as RedirectImplementationBuilder;
+                                                                              return (openedRedirector != null &&
+                                                                                      openedRedirector.Target ==
+                                                                                      callerToReplace.Item1);
+
+                                                                          }
+                            );
+                        if (indexToReplace >= 0)
+                            implementators[indexToReplace] = callerToReplace.Item2;
+                        return null; //neni potreba nic vracet pokud callerToReplace!=null
+                    }
                 }
+                break;
             }
 
             implementators.Add(builder);//jinak ji pridame na konec
@@ -444,6 +521,7 @@ namespace Agama.Perun
         private Func<BuildingContext, T> CreateFunc<T>(Func<T> innerFunc)
         {
             return ctx => innerFunc(); //carrying 
+            
         }
 
 
@@ -470,12 +548,13 @@ namespace Agama.Perun
 
         }
 
-
-         
-
-        private Func<TInterface> CreateFunc<TInterface, TReal>()
+        private Func<TReal> CreateFunc<TReal>()
         {
-            return this.GetBuildUpFunc<TInterface>(typeof(TReal));
+            return this.GetBuildUpFunc<TReal>(typeof(TReal));
+        }
+        private Func<TPlugin> CreateFunc<TReal,TPlugin>()
+        {
+            return this.GetBuildUpFunc<TPlugin>(typeof(TReal));
         }
 
 

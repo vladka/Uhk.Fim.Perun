@@ -54,19 +54,31 @@ namespace Agama.Perun
         /// <param name="match">Optional. If null, every instances from every scopes are removed.</param>
         public void RemoveAll(Predicate<object> match ) 
         {
-            var toDelete = new List<WeakReference>();
-            foreach (KeyValuePair<WeakReference, List<ScopedValuesCollection>> pair in _all)
+            
+
+            bool runAgain = true;
+            while (runAgain)
             {
-                if ((!pair.Key.IsAlive) || (match != null && (!match(pair.Key.Target)))) 
-                    continue;
-                foreach (var scopedValues in pair.Value)
+                runAgain = false;
+                var toDelete = new List<WeakReference>();
+                int currentCount = _all.Count;
+                foreach (KeyValuePair<WeakReference, List<ScopedValuesCollection>> pair in _all)
                 {
-                    scopedValues.Remove(pair.Key);
+                    if ((!pair.Key.IsAlive) || (match != null && (!match(pair.Key.Target))))
+                        continue;
+                    foreach (var scopedValues in pair.Value)
+                    {
+                        scopedValues.Remove(pair.Key);
+                    }
+                    toDelete.Add(pair.Key);
+                    runAgain = (_all.Count != currentCount);
+                    if (runAgain)
+                        //enumeration was changed, becasue during disposing some component was some new component created.
+                        break;
+
                 }
-                toDelete.Add(pair.Key);
-                
+                toDelete.ForEach(x => _all.Remove(x));
             }
-            toDelete.ForEach(x=>_all.Remove(x));
         }
         
       

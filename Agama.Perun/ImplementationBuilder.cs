@@ -10,7 +10,7 @@ namespace Agama.Perun
     /// <summary>
     /// Generic builder used for resolving fully specified componenets (not for opened generic types)
     /// </summary>
-    public class ImplementationBuilder<TPluginType> : IImplementationBuilder<TPluginType>
+    internal class ImplementationBuilder<TPluginType> : IImplementationBuilder<TPluginType>
     {
 
         
@@ -18,7 +18,7 @@ namespace Agama.Perun
         private readonly Func<BuildingContext, TPluginType> _factoryMethod;
         private readonly IPerunScope _scope;
         private readonly ScopedValuesCollection _scopedValues;
-        private readonly Type _pluginType;
+        protected  Type _pluginType;
 
         internal ImplementationBuilder(PerunContainer container, Func<BuildingContext, TPluginType> factoryMethod, IPerunScope scope)
         {
@@ -126,6 +126,12 @@ namespace Agama.Perun
 
         }
 
+        public  IConfiguredPluginInfo RegisterAgain(Type anotherPluginType)
+        {
+            this._container.RegisterInternal(anotherPluginType, this);
+            return this;
+        }
+
         public IPerunScope Scope
         {
             get
@@ -137,7 +143,7 @@ namespace Agama.Perun
         /// <summary>
         /// Type for what is this instance defined
         /// </summary>
-        public Type PluginType
+        public virtual Type PluginType
         {
             get
             {
@@ -159,6 +165,7 @@ namespace Agama.Perun
             var scopeObj = _scope.Context;
             if (scopeObj == null)
             {
+                
                 //scope cache is not needed
                 var args = new AfterBuiltComponentEventArgs<TPluginType>(_factoryMethod(ctx));
                 OnAfterBuiltNewComponent(args);
@@ -238,10 +245,30 @@ namespace Agama.Perun
     }
 
 
+
+    /// <summary>
+    /// Generic builder used for resolving fully specified componenets (not for opened generic types)
+    /// </summary>
+    internal class ImplementationBuilder<TPluginType, TReal> : ImplementationBuilder<TReal> where TReal : TPluginType
+    {
+        
+        private readonly Func<BuildingContext, TReal> _factoryMethod;
+
+
+        internal ImplementationBuilder(PerunContainer container, Func<BuildingContext, TReal> factoryMethod, IPerunScope scope)
+            : base(container,factoryMethod,scope)
+        {
+            _pluginType = typeof(TPluginType); //to be quick
+
+        } 
+
+    }
+
+
     /// <summary>
     /// Builder used for resolving fully specified componenets (not for opened generic types)
     /// </summary>
-    public class ImplementationBuilder : IImplementationBuilder
+    internal class ImplementationBuilder : IImplementationBuilder
     {
         private readonly PerunContainer _container;
         public readonly OpenedImplementationBuilder Creator;
@@ -315,7 +342,7 @@ namespace Agama.Perun
             }
         }
         /// <summary>
-        /// Type for what is this instance defined
+        /// Type for what  this instance is defined
         /// </summary>
         public Type PluginType
         {
@@ -325,25 +352,7 @@ namespace Agama.Perun
             }
         }
 
-        //public void Eject(bool dispose)
-        //{
-        //    //todo: co delat v pripade BindingContextScope?
-        //    var scopeObj = _scope.Context;
-        //    if (scopeObj != null)
-        //    {
-        //       var value =   _scopedValues.FindValueByScope(scopeObj);
-        //       if (dispose)
-        //       {
-        //           var d = value as IDisposable;
-        //           if (d != null)
-        //               d.Dispose();
-        //       }
-        //        _scopedValues.Remove();
-
-        //    }
-
-        //}
-
+       
        
 
         public object Get(BuildingContext ctx)
@@ -357,6 +366,8 @@ namespace Agama.Perun
             var scopeObj = _scope.Context;
             if (scopeObj == null)
             {   //scope cache is not needed
+
+                
                 var args = new AfterBuiltComponentEventArgs(_factoryMethod(ctx));
                 OnAfterBuiltNewComponent(args);
                 return args.Component;
